@@ -1,0 +1,285 @@
+# StudySync — Stage 1: Accounts & Profiles
+
+Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
+
+This is Stage 1 of a five-stage build. A student can register, sign in, set their name and department, pick courses, tick topics per course, and set a weekly availability grid. Everything works offline and syncs when the connection returns.
+
+Matching, groups, chat, materials and notifications are later stages. Home shows an honest "coming in Stage 2" placeholder rather than a button that does nothing.
+
+## What you need
+
+- Node.js 18 or newer
+- A free Supabase account and project
+- Expo Go on your phone
+- No card required at this tier
+
+## Setup
+
+### 1. Install
+
+```bash
+cd studysync
+npm install
+```
+
+### 2. Create your Supabase project
+
+At supabase.com, create a project. Note the region — pick the closest one to Nigeria (usually `eu-west-1` or `eu-central-1`) since latency shows up directly in the 2-second chat target in Stage 3.
+
+### 3. Run the migrations
+
+Supabase dashboard → SQL Editor → New query. Run these three files in order, each as a separate query:
+
+1. `supabase/migrations/0001_stage1_schema.sql` — tables, triggers, the overlap function
+2. `supabase/migrations/0002_stage1_rls.sql` — row level security policies
+3. `supabase/seed/0003_seed_courses_topics.sql` — placeholder courses and topics
+
+Order matters: 0002 adds policies to tables 0001 creates, and 0003 inserts into them.
+
+**The seed data is placeholder.** The course codes follow the usual Nigerian convention and the topics are conventional for those subjects, but I have not seen the UI syllabus. Check every row against real course outlines before your pilot — topic overlap is weighted heaviest (0.5) in the compatibility score, so wrong topic lists produce confidently wrong matches.
+
+### 4. Wire up your credentials
+
+```bash
+cp .env.example .env
+```
+
+Fill in `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` from Project Settings → API.
+
+The anon key is safe to ship in a mobile app — it is designed to be public, and RLS is what actually protects data. Never put the `service_role` key in `.env`; it bypasses RLS entirely and belongs only in Edge Function secrets from Stage 2 onward.
+
+### 5. Decide on email confirmation
+
+Authentication → Providers → Email. If "Confirm email" is on, signup shows a "check your email" screen and you cannot proceed until you click the link. **For testing, turn it off** — it makes creating the two test accounts you need for the RLS check much faster.
+
+### 6. Run it
+
+```bash
+npx expo start
+```
+
+Scan the QR with Expo Go. If you change `.env`, restart with `npx expo start --clear` — Expo only reads env vars at startup.
+
+## Verifying it works
+
+### Unit tests
+
+```bash
+npm test
+```
+
+Covers the availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names) and profile validation. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
+
+```bash
+npm run typecheck
+```
+
+### Manual walkthrough
+
+Time yourself against the 5-minute onboarding target:
+
+1. Create an account
+2. Enter name and department
+3. Pick two or three courses
+4. Set availability — tap a day name to fill the whole column
+5. Land on home, tap a course, tick some topics, save
+6. Confirm home reflects the topic count
+
+### Offline behaviour
+
+This is the heaviest requirement in the spec, so test it properly:
+
+1. With the app open and signed in, turn on airplane mode
+2. A grey banner appears: "Offline — showing saved data"
+3. Edit your profile and save. The banner turns amber: "1 change saved, will sync automatically"
+4. Force-quit the app and reopen it. Your edit is still there and still queued — the queue is in AsyncStorage, not memory
+5. Turn airplane mode off. The queue drains on its own and the banner disappears
+6. Check the Supabase table editor — the change landed
+
+Worth also trying: queue several changes, then reconnect. They apply in order, because a topic selection depends on its course enrolment existing first.
+
+### RLS — the check that actually matters
+
+The spec's definition of done requires proving a student outside a group cannot read its data, not just that the UI hides it. Same principle applies to profiles in Stage 1.
+
+**The SQL editor cannot test this.** It runs as superuser and bypasses RLS completely, so everything looks readable and you learn nothing.
+
+Do this instead:
+
+1. Create two accounts (A and B) through the app
+2. Sign in as A, complete onboarding, note A's `user_id` from Supabase → Authentication → Users
+3. Sign out, sign in as B
+4. In `app/(app)/home.tsx`, temporarily add inside the component:
+
+```ts
+// TEMPORARY RLS CHECK — remove after verifying
+useEffect(() => {
+  void supabase
+    .from('users')
+    .select('*')
+    .eq('user_id', 'PASTE_USER_A_ID_HERE')
+    .then(({ data, error }) => {
+      console.log('RLS check — rows:', data?.length ?? 0, 'error:', error?.message);
+    });
+}, []);
+```
+
+5. Expect `rows: 0` with no error. Zero rows and no error is exactly right: RLS filters invisibly rather than raising a permission error, so B's query returns an empty set as if A did not exist.
+6. Repeat against `user_courses` filtered by A's id — also zero
+7. Remove the block
+
+If you see rows, RLS is not doing its job. Check that `0002_stage1_rls.sql` ran without errors and that `pg_tables.rowsecurity` is true for every table.
+
+## Stage 2 — Group Formation (in progress)
+
+The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). Run them in order after Stage 1's `0001`–`0003`.
+
+The compatibility score is the spec's weighted sum, normalised to `[0, 1]`:
+
+```
+score = 0.5 · topicOverlap + 0.3 · scheduleOverlap + 0.2 · groupFillBonus
+```
+
+Topic fit is weighted heaviest (you're there to study the same thing), schedule next (you have to actually meet), with a small nudge toward filling a near-complete group. Both overlaps normalise against the *more constrained* side, not the maximum, so a focused or time-poor student is not punished for it. See `src/lib/matching.ts`.
+
+### Pathway One — the `find-group` matching function
+
+`supabase/functions/find-group` is an Edge Function that answers "find me a group for this course". It runs server-side for a privacy reason, not a performance one: RLS restricts `users` and `user_courses` to their owner, so the app *cannot* read other students' topics or availability. Matching needs exactly that, across many students, so it runs with the `service_role` key (an Edge Function secret, never shipped in the app), reads what it needs, scores it, and returns only privacy-safe fields — name and department, a score, and shared counts. Never an email, a raw availability mask, or a topic-id list.
+
+It is read-only. It *suggests* existing joinable groups (ranked) and lone students to form a new group with (ranked). Acting on a suggestion — `request_to_join`, or `create_group` + `send_invitation` — is the client's job through the `0005` RPCs.
+
+**The scoring is duplicated, on purpose.** The app imports `src/lib/matching.ts`; the function imports a hand-kept copy at `supabase/functions/_shared/matching.ts`, because the Deno function tree can't reliably reach up into `src/` at deploy time. The two copies must stay identical — the region between the `// === MIRROR START ===` / `// === MIRROR END ===` sentinels is asserted byte-for-byte equal by `src/lib/__tests__/mirror.test.ts`, so drift fails `npm test` rather than silently scoring differently on client and server. `_shared/availability.ts` is a full copy of `src/lib/availability.ts` under the same rule. **Change one, change both** — the same discipline as the `availability.ts` ⇄ SQL `availability_overlap()` pairing.
+
+Deploy and test it (needs the Supabase CLI and Deno, neither required for the app itself):
+
+```bash
+supabase functions deploy find-group
+```
+
+Locally:
+
+```bash
+supabase functions serve find-group
+```
+
+then call it with a real user's JWT (copy an `access_token` from a signed-in session) and a course id:
+
+```bash
+curl -i -X POST http://localhost:54321/functions/v1/find-group \
+  -H "Authorization: Bearer <USER_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"course_id":"<COURSE_UUID>"}'
+```
+
+Expect a JSON body with `requester`, a ranked `groups` array, and a ranked `suggested_partners` array. A caller not enrolled in the course gets a `400`; no JWT gets a `401`. `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform — nothing to set by hand.
+
+### Admin-initiated batch matching — the `run-batch-matching` function
+
+`find-group` waits to be asked. Its counterpart, `supabase/functions/run-batch-matching`, is how an operator *starts* system matching for a whole course — "signify to the system when to begin the group matching" once enough students have enrolled. It reads the course's waiting pool, carves it into groups with the same mirrored scoring, and writes them.
+
+**Who may run it.** There is no admin user in the schema, by design. The function authorises by requiring the request's bearer token to equal the `service_role` key — "admin" is whoever holds that key (you, from the dashboard or a script). Because that check lives entirely in the function, deploy it so the platform's own JWT gate doesn't reject the service key first:
+
+```bash
+supabase functions deploy run-batch-matching --no-verify-jwt
+```
+
+**Who's in the pool.** Every student enrolled in the course with `user_courses.matching_pref = 'system'` (the default on enrolment), minus anyone already in a group on that course. A student who would rather organise their own group sets `matching_pref = 'self_organized'` (through the `set_matching_pref` RPC in `0007`) and is left out — "the self-matching students are not among." So is anyone who has already self-organised, since group membership excludes them too.
+
+**How it groups.** Group size is a random target of 3–6, per the product decision. Two rules keep the tail humane: a remainder of 2–6 becomes one final group (a pair is allowed), and a target that would strand exactly one student is shrunk by one. So any pool of ≥ 2 is fully grouped, and only a lone student (a pool of exactly one) comes back in `waiting`, to be picked up on the next run. Each group is written through the `create_system_group` RPC (`0007`) — service-role-only, the sole write path, mirroring how the client's own mutations go through definer RPCs.
+
+Try it with `dry_run` first — it runs the full partition and returns the proposed groups **without writing anything** (needs the Supabase CLI and Deno, as with `find-group`):
+
+```bash
+curl -i -X POST http://localhost:54321/functions/v1/run-batch-matching \
+  -H "Authorization: Bearer <SERVICE_ROLE_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"course_id":"<COURSE_UUID>","dry_run":true}'
+```
+
+Happy with the preview? Drop `dry_run` to actually form the groups (and optionally hold until enough have enrolled with `min_pool`):
+
+```bash
+curl -i -X POST http://localhost:54321/functions/v1/run-batch-matching \
+  -H "Authorization: Bearer <SERVICE_ROLE_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"course_id":"<COURSE_UUID>","min_pool":8}'
+```
+
+The response is a run summary: `pool_size`, the `groups` formed (each with its members' names and ids, a size, and a `cohesion` score) and any `waiting` leftover. Names and ids are fine here — the caller is the trusted operator, not a student, so none of `find-group`'s privacy masking applies. A non-`service_role` token gets a `403`; a pool below `min_pool` returns `ran: false` with a reason and forms nothing. Re-running is self-healing: students just grouped drop out of the next pool, so a second run only regroups whoever is still waiting.
+
+Still to build for Stage 2: the client screens (discover, group detail, invitations, join requests, create group) and Pathway Two's self-organized flow. The home screen still shows the honest "coming in Stage 2" placeholder until those land.
+
+## Layout
+
+```
+app/                      expo-router routes
+  _layout.tsx             providers + auth route guard
+  (auth)/                 login, signup
+  (onboarding)/           profile → courses → availability
+  (app)/                  home, profile, topics
+src/
+  components/             Button, TextField, Screen, AvailabilityGrid, OfflineBanner
+  context/                AuthContext, NetworkContext
+  hooks/                  useCourses, useUserCourses
+  lib/
+    supabase.ts           client + error mapping
+    availability.ts       bitmask encoding, overlap scoring, group common grid
+    matching.ts           compatibility scoring (mirrored to the Edge Function)
+    cache.ts              offline read cache
+    outbox.ts             offline write queue
+    validation.ts         form rules
+    __tests__/            unit tests (incl. mirror-drift guard)
+  types/
+    database.ts           schema types (Stage 1 + Stage 2 tables)
+    matching.ts           find-group + batch-matching response contracts
+supabase/
+  migrations/             schema + RLS (0001–0007)
+  seed/                   placeholder courses and topics
+  functions/
+    _shared/              mirrored availability.ts + matching.ts
+    find-group/           Pathway One matching Edge Function
+    run-batch-matching/   admin-initiated batch matching Edge Function
+```
+
+## Decisions worth knowing
+
+**Topics are a fixed curated list per course**, not free text. Matching compares topic id sets, so overlap is exact. Free text would silently under-report — "recursion" and "Recursive functions" scoring as zero overlap is the failure mode that makes a matching app feel broken.
+
+**Availability is a 7×4 grid stored as `bit(28)`.** Overlap is `bit_count(a & b)`, one cheap operation per candidate. Bit index is `day * 4 + slot`, bit 0 leftmost. The TypeScript in `src/lib/availability.ts` and the SQL `availability_overlap()` must agree on this — change one, change both.
+
+**Schedule overlap normalises against the more constrained student**, not against 28 slots. A student free only Monday morning who overlaps with someone free all week scores 1.0, because they can always meet. Dividing by 28 would score that 0.036 and effectively lock time-poor students out of good matches.
+
+**Offline is full queue-and-sync**, per your call. Writes queue in AsyncStorage with a uuid that Postgres records in `applied_client_actions`; a replay whose response was lost hits a duplicate-key error, which the queue treats as success. This is what stops "save profile" on flaky wifi from creating duplicate rows. The queue is strictly FIFO and a permanent failure dead-letters rather than blocking the queue behind it.
+
+**One availability grid applies to all courses** during onboarding. The schema stores it per enrolment, so per-course editing can be added later with no migration — but four grids during onboarding would blow the 5-minute target on its own.
+
+## Schema additions beyond the original spec
+
+Found during spec review; the feature logic requires them:
+
+- `topics` table — needed once topics became a curated list
+- `user_course_topics` join — normalised so matching counts overlap in SQL rather than intersecting arrays in JS
+- unique `(user_id, course_id)` on `user_courses`
+- `device_push_tokens` — Expo cannot deliver a push without a stored token per device
+- `applied_client_actions` — idempotency ledger for offline replay
+- `users.onboarding_complete` — gates routing; computing it on every read would mean three queries before the router can decide anything
+
+Still to add in Stage 2: `invitations` and `join_requests` tables, and `groups.is_discoverable`, `last_activity_at`, `max_members`.
+
+## Known gaps at this stage
+
+The `topics.set` write cannot run while its parent course enrolment is still queued offline — there is no `user_course_id` to attach topics to yet. The UI says so explicitly rather than dropping the selection. Narrow case: add a course offline, then try to set its topics before reconnecting.
+
+Availability edits apply to every enrolled course at once. Intentional for now, per above.
+
+Home is a Stage 1 endpoint. It shows the profile and routes to editing; matching is Stage 2.
+
+## Before Stage 2
+
+Two things worth knowing now rather than later:
+
+**Supabase pauses free projects after about a week of inactivity.** Fine during the build, but during a two-week pilot a quiet weekend could pause the project mid-pilot. Open the dashboard periodically, or plan to upgrade for the pilot window.
+
+**Expo Go on Android dropped remote push notification support in SDK 53.** Stages 1–4 test fine in Expo Go. Stage 5 will need an EAS dev build on your phone. Nothing to do about it now, but it is not a surprise you want at Stage 5.
+
+Stage 2 also needs three things resolved that Stage 1 did not touch: `Sessions` has no roadmap stage despite the Active lifecycle state and all time-based notifications depending on it (I would slot it after Materials), Stage 4's "upload fires a notification" needs Stage 4 writing `Notifications` rows with Stage 5 adding delivery on top, and RLS on `group_members` will need a `security definer` helper to avoid infinite recursion when its policy queries its own table.

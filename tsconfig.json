@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "//": "supabase/functions is Deno, not React Native — it has its own toolchain (supabase/functions/deno.json) and uses Deno globals + .ts import specifiers that this tsc project rejects. Type-check it with `deno check` instead.",
+  "exclude": ["node_modules", "supabase/functions"]
+}

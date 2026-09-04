@@ -1,0 +1,11 @@
+{
+  "//": "Deno config for Supabase Edge Functions. The Supabase CLI reads this when it serves/deploys functions. imports pins the supabase-js version so index.ts and the _shared mirror resolve the same client the app uses (package.json: 2.48.1).",
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  }
+}

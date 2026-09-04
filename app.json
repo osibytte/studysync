@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "StudySync",
+    "slug": "studysync",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "studysync",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#12263A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.studysync.app"
+    },
+    "android": {
+      "package": "com.studysync.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#12263A"
+      }
+    },
+    "plugins": ["expo-router"]
+  }
+}
