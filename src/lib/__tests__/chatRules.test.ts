@@ -45,7 +45,9 @@ import {
   sessionRuleLabel,
   sessionTallyLabel,
   sessionWhenLabel,
+  totalUnread,
   unreadBadge,
+  unreadSummary,
   upsertMessages,
   validateMessageBody,
   validateSessionProposal,
@@ -691,6 +693,45 @@ describe('lastMessageLine', () => {
 
   it('names me like anyone else when no current user is given', () => {
     expect(lastMessageLine({ last_body: 'hi', last_sender_id: ME }, nameFor)).toBe('Ada: hi');
+  });
+});
+
+describe('totalUnread / unreadSummary', () => {
+  it('adds up only the groups that actually have something unread', () => {
+    const rows = [{ unread_count: 3 }, { unread_count: 0 }, { unread_count: 1 }];
+    expect(totalUnread(rows)).toBe(4);
+    expect(unreadSummary(rows)).toBe('4 unread messages in 2 groups');
+  });
+
+  it('says nothing at all when nothing is unread', () => {
+    expect(totalUnread([])).toBe(0);
+    expect(unreadSummary([])).toBeNull();
+    // The RPC returns a row per membership, so all-zero is the common case.
+    expect(unreadSummary([{ unread_count: 0 }, { unread_count: 0 }])).toBeNull();
+  });
+
+  it('leaves the group out of the sentence when there is only one', () => {
+    expect(unreadSummary([{ unread_count: 1 }])).toBe('1 unread message');
+    expect(unreadSummary([{ unread_count: 7 }, { unread_count: 0 }])).toBe(
+      '7 unread messages'
+    );
+  });
+
+  it('does not cap, unlike the badge — this is prose, not a chip', () => {
+    expect(unreadSummary([{ unread_count: 143 }, { unread_count: 8 }])).toBe(
+      '151 unread messages in 2 groups'
+    );
+    expect(unreadBadge(151)).toBe('99+');
+  });
+
+  it('ignores a count that is negative, fractional or not a number', () => {
+    const rows = [
+      { unread_count: -4 },
+      { unread_count: Number.NaN },
+      { unread_count: 2.9 },
+    ];
+    expect(totalUnread(rows)).toBe(2);
+    expect(unreadSummary(rows)).toBe('2 unread messages');
   });
 });
 

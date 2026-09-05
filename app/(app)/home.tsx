@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useInvitations } from '@/hooks/useInvitations';
 import { useMyGroups } from '@/hooks/useMyGroups';
+import { useUnread } from '@/hooks/useUnread';
 import { useUserCourses } from '@/hooks/useUserCourses';
 import { countSelected, decodeAvailability, describeSelection } from '@/lib/availability';
 import { colors, fontSize, radius, spacing, typography } from '@/theme';
@@ -30,13 +31,14 @@ export default function HomeScreen() {
   const { userCourses, loading, reload } = useUserCourses(userId);
   const { groups, reload: reloadGroups } = useMyGroups(userId);
   const { invitations, reload: reloadInvites } = useInvitations(userId);
+  const { summary: unreadSummaryLine, reload: reloadUnread } = useUnread(userId);
 
   const onRefresh = useCallback(async () => {
     // Drain the outbox before refetching, or a pull-to-refresh would overwrite
     // pending local changes with older server state.
     await syncNow();
-    await Promise.all([reload(), reloadGroups(), reloadInvites()]);
-  }, [syncNow, reload, reloadGroups, reloadInvites]);
+    await Promise.all([reload(), reloadGroups(), reloadInvites(), reloadUnread()]);
+  }, [syncNow, reload, reloadGroups, reloadInvites, reloadUnread]);
 
   /**
    * Refetch the group counts when home comes back into focus.
@@ -44,6 +46,9 @@ export default function HomeScreen() {
    * This screen stays mounted while the student joins, creates or leaves a group
    * in the groups section, so without this the card would keep reporting the
    * count from before. The first focus is skipped — each hook fetches on mount.
+   *
+   * `useUnread` is deliberately absent: it runs its own focus effect, so listing
+   * it here would fetch the counts twice on every return.
    */
   const firstFocus = useRef(true);
   useFocusEffect(
@@ -98,6 +103,14 @@ export default function HomeScreen() {
               {invitations.length} pending invitation
               {invitations.length === 1 ? '' : 's'} waiting for an answer
             </Text>
+          )}
+          {/*
+            Below the invitation line on purpose. An unanswered invite holds up
+            somebody else's group, so it keeps the accent colour; unread messages
+            will still be there in an hour. Null offline — see `useUnread`.
+          */}
+          {unreadSummaryLine !== null && (
+            <Text style={styles.unreadLine}>{unreadSummaryLine}</Text>
           )}
           <Button
             label={groups.length === 0 ? 'Find a study group' : 'Open your groups'}
@@ -203,6 +216,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
     color: colors.primary,
+    marginBottom: spacing.md,
+  },
+  // Same weight as the invitation line, plain text colour: informational, not a nudge.
+  unreadLine: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.text,
     marginBottom: spacing.md,
   },
   sectionHeaderRow: {

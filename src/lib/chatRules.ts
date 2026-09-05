@@ -403,6 +403,40 @@ export function lastMessageLine(
   return name ? `${name}: ${body}` : body;
 }
 
+/** Total across every group, ignoring rows the RPC returned with nothing unread. */
+export function totalUnread(
+  rows: readonly Pick<UnreadCountRow, 'unread_count'>[]
+): number {
+  let total = 0;
+  for (const row of rows) {
+    const n = row.unread_count;
+    if (Number.isFinite(n) && n > 0) total += Math.floor(n);
+  }
+  return total;
+}
+
+/**
+ * Home's one line about the chats: "4 unread messages in 2 groups".
+ *
+ * Null when there is nothing unread, so the caller renders nothing rather than a
+ * cheerful zero. The group count is only named when it is more than one — "3
+ * unread messages in 1 group" is a sentence nobody writes.
+ *
+ * Uncapped, unlike `unreadBadge`: this is prose with room for a real number,
+ * where a badge is a chip that has to fit beside a group's name.
+ */
+export function unreadSummary(
+  rows: readonly Pick<UnreadCountRow, 'unread_count'>[]
+): string | null {
+  const total = totalUnread(rows);
+  if (total === 0) return null;
+  const groups = rows.filter(
+    (row) => Number.isFinite(row.unread_count) && row.unread_count > 0
+  ).length;
+  const messages = `${total} unread message${total === 1 ? '' : 's'}`;
+  return groups > 1 ? `${messages} in ${groups} groups` : messages;
+}
+
 // ---------------------------------------------------------------------------
 // Study times (0016)
 // ---------------------------------------------------------------------------

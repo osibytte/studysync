@@ -17,9 +17,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useInvitations } from '@/hooks/useInvitations';
 import { useMyGroups } from '@/hooks/useMyGroups';
+import { useUnread } from '@/hooks/useUnread';
+import { lastMessageLine, unreadBadge } from '@/lib/chatRules';
 import { capacityLabel, isCreator } from '@/lib/groupRules';
 import { colors, fontSize, radius, spacing, typography } from '@/theme';
-import type { MyGroupRow } from '@/types/database';
+import type { MyGroupRow, UnreadCountRow } from '@/types/database';
 
 /**
  * "Your groups" — the hub for Stage 2.
@@ -37,13 +39,14 @@ export default function GroupsScreen() {
   const userId = profile?.user_id ?? null;
   const { groups, loading, error, reload } = useMyGroups(userId);
   const { invitations, reload: reloadInvites } = useInvitations(userId);
+  const { byGroup, reload: reloadUnread } = useUnread(userId);
 
   const onRefresh = useCallback(async () => {
     // Drain first: a queued group.create should land before we refetch, or the
     // refresh would replace the optimistic card with server state that predates it.
     await syncNow();
-    await Promise.all([reload(), reloadInvites()]);
-  }, [syncNow, reload, reloadInvites]);
+    await Promise.all([reload(), reloadInvites(), reloadUnread()]);
+  }, [syncNow, reload, reloadInvites, reloadUnread]);
 
   /**
    * Refetch when this screen comes back into focus.
@@ -113,6 +116,8 @@ export default function GroupsScreen() {
             <GroupRow
               key={group.group_id}
               group={group}
+              unread={byGroup[group.group_id]}
+              currentUserId={userId}
               onPress={() => router.push(`/(app)/groups/${group.group_id}`)}
             />
           ))
@@ -160,21 +165,60 @@ export default function GroupsScreen() {
   );
 }
 
-/** One card in the list. Name, course, state, capacity, and your role. */
-function GroupRow({ group, onPress }: { group: MyGroupRow; onPress: () => void }) {
+/**
+ * One card in the list. Name, course, state, capacity, your role — and, since
+ * Stage 3, what the group last said and how much of it you have not read.
+ *
+ * `unread` is undefined for a group `my_unread_counts()` did not describe, which
+ * offline is every group (see `useUnread`). The card then renders exactly as it
+ * did before Stage 3 rather than claiming a silent zero.
+ *
+ * The preview names no sender. This screen has no roster, and `my_unread_counts`
+ * returns `last_sender_id` without a name because RLS on `public.users` is
+ * own-row only — so `nameFor` can only ever answer null here, and
+ * `lastMessageLine` degrades to the bare body. The one name it can resolve
+ * locally is the student's own, which is why `currentUserId` is passed: "You:
+ * see you at 4" is worth the prop.
+ */
+function GroupRow({
+  group,
+  unread,
+  currentUserId,
+  onPress,
+}: {
+  group: MyGroupRow;
+  unread: UnreadCountRow | undefined;
+  currentUserId: string | null;
+  onPress: () => void;
+}) {
+  const badge = unread ? unreadBadge(unread.unread_count) : null;
+  const preview = unread ? lastMessageLine(unread, () => null, currentUserId) : '';
+
   return (
     <Pressable
       onPress={onPress}
       style={styles.card}
       accessibilityRole="button"
-      accessibilityLabel={`${group.group_name}, ${
-        group.course?.course_code ?? 'course unknown'
-      }, ${capacityLabel(group.member_count, group.max_members)}`}
+      accessibilityLabel={[
+        group.group_name,
+        group.course?.course_code ?? 'course unknown',
+        capacityLabel(group.member_count, group.max_members),
+        // Spelled out rather than the chip's "99+", which does not read aloud.
+        badge && `${unread?.unread_count} unread message${unread?.unread_count === 1 ? '' : 's'}`,
+        preview && `last message, ${preview}`,
+      ]
+        .filter(Boolean)
+        .join(', ')}
     >
       <View style={styles.cardTop}>
         <Text style={styles.cardName} numberOfLines={1}>
           {group.group_name}
         </Text>
+        {badge !== null && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        )}
         <StatusPill status={group.status} />
       </View>
       <Text style={styles.cardCourse}>
@@ -185,6 +229,14 @@ function GroupRow({ group, onPress }: { group: MyGroupRow; onPress: () => void }
         {capacityLabel(group.member_count, group.max_members)}
         {isCreator(group.role) ? ' · you created this' : ''}
       </Text>
+      {preview !== '' && (
+        <Text
+          style={[styles.cardPreview, badge !== null && styles.cardPreviewUnread]}
+          numberOfLines={1}
+        >
+          {preview}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -228,6 +280,32 @@ const styles = StyleSheet.create({
   },
   cardCourse: { fontSize: fontSize.sm, color: colors.primary, marginTop: spacing.xs },
   cardMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  cardPreview: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  /** Unread reads as darker and heavier, so the badge is not the only signal. */
+  cardPreviewUnread: { color: colors.text, fontWeight: '600' },
+  /**
+   * Shaped like `StatusPill` on purpose — same padding, radius and text size —
+   * but the only filled chip on the card, which is what makes it the thing your
+   * eye lands on. `minWidth` keeps a single digit from squashing into a stripe.
+   */
+  badge: {
+    minWidth: 24,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    marginRight: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  badgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.textInverse,
+    textAlign: 'center',
+  },
   sectionHeader: {
     fontSize: fontSize.md,
     fontWeight: '700',
