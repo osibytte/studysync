@@ -64,6 +64,21 @@ export function validateDepartment(department: string): string | null {
   return null;
 }
 
+/**
+ * Group name, mirroring the `groups` CHECK in 0004:
+ * `length(btrim(group_name)) between 1 and 80`.
+ *
+ * Same bounds deliberately. A name the client accepts and Postgres rejects
+ * surfaces as an opaque constraint error after the round trip — and offline, not
+ * until the queue drains, by which point the student has moved on.
+ */
+export function validateGroupName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Give the group a name';
+  if (trimmed.length > 80) return 'Group name is too long';
+  return null;
+}
+
 /** Profile is complete enough to leave onboarding. */
 export interface ProfileCompleteness {
   hasName: boolean;

@@ -93,7 +93,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 // ===========================================================================
-// Stage 2 — Group Formation. Mirrors migrations 0004–0006. Kept in sync with
+// Stage 2 — Group Formation. Mirrors migrations 0004–0010. Kept in sync with
 // the SQL by hand (see the header note): change a migration, change this file.
 // ===========================================================================
 
@@ -179,4 +179,66 @@ export interface StudentSearchRow {
   user_id: string;
   full_name: string | null;
   department: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Read RPCs added in 0010, for the Stage 2 client screens.
+//
+// These exist because RLS on public.users is own-row only: a member can read
+// `group_members` (ids and roles) but not the names behind those ids. Each of
+// these is SECURITY DEFINER, gated on membership, and returns name + department
+// only — the same privacy posture as search_students.
+// ---------------------------------------------------------------------------
+
+/** Return row of `group_members_detail(p_group_id)` — the roster, with names. */
+export interface GroupMemberDetailRow {
+  user_id: string;
+  full_name: string | null;
+  department: string | null;
+  role: GroupRole;
+  joined_at: string;
+}
+
+/** Return row of `my_invitations()` — the invitee's inbox, fully resolved. */
+export interface InvitationDetailRow {
+  invitation_id: string;
+  group_id: string;
+  group_name: string;
+  course_id: string;
+  course_code: string;
+  course_title: string;
+  inviter_id: string;
+  inviter_name: string | null;
+  member_count: number;
+  max_members: number;
+  group_status: GroupStatus;
+  created_at: string;
+}
+
+/** Return row of `group_join_requests(p_group_id)` — who is asking to join. */
+export interface JoinRequestDetailRow {
+  request_id: string;
+  requester_id: string;
+  full_name: string | null;
+  department: string | null;
+  created_at: string;
+}
+
+/**
+ * A group the signed-in student belongs to, as the groups list renders it.
+ *
+ * Assembled client-side from one nested select over group_members → groups →
+ * courses (all three readable to a member under the 0005 policies), so it needs
+ * no RPC. `role` is the caller's own role in that group.
+ *
+ * `member_count` is filled by a second small query for the rosters of exactly
+ * these groups — allowed by group_members_select_member, since the caller is in
+ * every one of them — rather than by the discover_groups RPC, which deliberately
+ * excludes groups you are already in.
+ */
+export interface MyGroupRow extends Group {
+  role: GroupRole;
+  joined_at: string;
+  member_count: number;
+  course: Course | null;
 }

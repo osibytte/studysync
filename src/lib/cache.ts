@@ -24,6 +24,17 @@ export const CacheKeys = {
   courses: () => `${PREFIX}:courses`,
   profile: (userId: string) => `${PREFIX}:user:${userId}:profile`,
   userCourses: (userId: string) => `${PREFIX}:user:${userId}:courses`,
+
+  // Stage 2. Group content is per-user because what a student may read of a
+  // group depends on their membership: cached under the group id alone, the
+  // next student on a shared phone would read a roster they are not in.
+  myGroups: (userId: string) => `${PREFIX}:user:${userId}:groups`,
+  invitations: (userId: string) => `${PREFIX}:user:${userId}:invitations`,
+  groupDetail: (userId: string, groupId: string) =>
+    `${PREFIX}:user:${userId}:group:${groupId}`,
+  /** Discoverable groups on one course — a browse result, not owned content. */
+  discover: (userId: string, courseId: string) =>
+    `${PREFIX}:user:${userId}:discover:${courseId}`,
 } as const;
 
 interface Envelope<T> {

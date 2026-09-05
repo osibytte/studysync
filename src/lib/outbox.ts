@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createGroup, leaveGroup } from './groups';
+import { makeActionId } from './ids';
 import { supabase, isNetworkError } from './supabase';
 
 /**
@@ -38,12 +40,23 @@ import { supabase, isNetworkError } from './supabase';
 const QUEUE_KEY = 'studysync:outbox:v1';
 const DEAD_KEY = 'studysync:outbox:dead:v1';
 
-/** Actions the queue knows how to replay. Extended as later stages land. */
+/**
+ * Actions the queue knows how to replay. Extended as later stages land.
+ *
+ * Stage 2 adds only the two group actions that are useful offline: creating a
+ * group and leaving one. The rest (invite, respond, approve) are deliberately
+ * online-only — each one depends on server state that may have changed while
+ * the device was offline (a group filling up, an invitation being cancelled),
+ * so queueing them would mostly produce dead-lettered actions and a confusing
+ * optimistic UI.
+ */
 export type OutboxActionType =
   | 'profile.update'
   | 'course.add'
   | 'course.remove'
-  | 'availability.set';
+  | 'availability.set'
+  | 'group.create'
+  | 'group.leave';
 
 export interface OutboxAction {
   /** uuid — doubles as the server-side idempotency key. */
@@ -62,19 +75,11 @@ export interface DeadAction extends OutboxAction {
 }
 
 /**
- * uuid v4 without a native dependency.
- *
- * expo-crypto would be better, but Math.random is adequate here: these ids
- * only need to be unique across one device's pending queue, and they are
- * never a security boundary.
+ * Re-exported so `enqueue`'s id generator and the outbox stay one import for
+ * callers. The implementation lives in ids.ts to keep groups.ts out of a
+ * require cycle with this module — see the note there.
  */
-export function makeActionId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+export { makeActionId };
 
 async function readQueue(): Promise<OutboxAction[]> {
   try {
@@ -162,24 +167,42 @@ function isDuplicateKey(error: unknown): boolean {
 }
 
 /**
+ * Actions whose server-side write claims the ledger row ITSELF.
+ *
+ * The Stage 2 group RPCs all begin with `claim_client_action(p_client_action_id,
+ * …)` and return early if it reports the id was already used. If this module
+ * pre-inserted that same id, the RPC would see its own action as an
+ * already-applied replay and silently do nothing — the group would never be
+ * created. So for these, the RPC owns the ledger and we skip the insert below;
+ * idempotency is identical, just enforced one layer down and inside the RPC's
+ * transaction (which is strictly better: the claim and the write commit or roll
+ * back together).
+ */
+const SELF_LEDGERED: readonly OutboxActionType[] = ['group.create', 'group.leave'];
+
+/**
  * Record the action id server-side, then run the write.
  *
  * The ledger insert goes FIRST and deliberately. If it reports a duplicate,
  * this action was already applied on a previous attempt whose response never
  * reached us, so we stop and report success rather than writing twice.
+ *
+ * The exception is SELF_LEDGERED actions, which do their own claiming.
  */
 async function applyAction(action: OutboxAction): Promise<void> {
-  const { error: ledgerError } = await supabase
-    .from('applied_client_actions')
-    .insert({
-      client_action_id: action.id,
-      user_id: action.userId,
-      action_type: action.type,
-    });
+  if (!SELF_LEDGERED.includes(action.type)) {
+    const { error: ledgerError } = await supabase
+      .from('applied_client_actions')
+      .insert({
+        client_action_id: action.id,
+        user_id: action.userId,
+        action_type: action.type,
+      });
 
-  if (ledgerError) {
-    if (isDuplicateKey(ledgerError)) return; // already applied — success
-    throw ledgerError;
+    if (ledgerError) {
+      if (isDuplicateKey(ledgerError)) return; // already applied — success
+      throw ledgerError;
+    }
   }
 
   switch (action.type) {
@@ -236,6 +259,36 @@ async function applyAction(action: OutboxAction): Promise<void> {
         .update({ availability })
         .eq('user_course_id', user_course_id);
       if (error) throw error;
+      return;
+    }
+
+    /**
+     * The group id was generated on the device when the student tapped Create,
+     * so the optimistic card and the row Postgres finally writes are the same
+     * object — nothing has to be reconciled when this lands.
+     */
+    case 'group.create': {
+      const { group_id, group_name, course_id, is_discoverable } =
+        action.payload as {
+          group_id: string;
+          group_name: string;
+          course_id: string;
+          is_discoverable?: boolean;
+        };
+      await createGroup({
+        groupId: group_id,
+        groupName: group_name,
+        courseId: course_id,
+        isDiscoverable: is_discoverable,
+        // The queued id, not a fresh one: that is what makes the replay a no-op.
+        clientActionId: action.id,
+      });
+      return;
+    }
+
+    case 'group.leave': {
+      const { group_id } = action.payload as { group_id: string };
+      await leaveGroup(group_id, action.id);
       return;
     }
 

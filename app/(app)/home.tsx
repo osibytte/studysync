@@ -1,22 +1,25 @@
-import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
+import { useInvitations } from '@/hooks/useInvitations';
+import { useMyGroups } from '@/hooks/useMyGroups';
 import { useUserCourses } from '@/hooks/useUserCourses';
 import { countSelected, decodeAvailability, describeSelection } from '@/lib/availability';
 import { colors, fontSize, radius, spacing, typography } from '@/theme';
 
 /**
- * Home — Stage 1 endpoint.
+ * Home.
  *
- * Shows the profile the student just built and gives them somewhere to edit it.
- * The "Find a group" affordance is intentionally a disabled placeholder: that
- * is Stage 2, and shipping a live-looking button that does nothing is worse
- * than showing an honest "coming next".
+ * Leads with groups, because from Stage 2 on that is what the student opens the
+ * app for; the profile they built in onboarding sits below it, where it is still
+ * easy to correct but no longer the point of the screen. Courses and availability
+ * stay visible on purpose — they are the two inputs matching actually uses, so a
+ * thin one of either should be obvious without going looking for it.
  */
 export default function HomeScreen() {
   const { profile, signOut } = useAuth();
@@ -25,13 +28,34 @@ export default function HomeScreen() {
 
   const userId = profile?.user_id ?? null;
   const { userCourses, loading, reload } = useUserCourses(userId);
+  const { groups, reload: reloadGroups } = useMyGroups(userId);
+  const { invitations, reload: reloadInvites } = useInvitations(userId);
 
   const onRefresh = useCallback(async () => {
     // Drain the outbox before refetching, or a pull-to-refresh would overwrite
     // pending local changes with older server state.
     await syncNow();
-    await reload();
-  }, [syncNow, reload]);
+    await Promise.all([reload(), reloadGroups(), reloadInvites()]);
+  }, [syncNow, reload, reloadGroups, reloadInvites]);
+
+  /**
+   * Refetch the group counts when home comes back into focus.
+   *
+   * This screen stays mounted while the student joins, creates or leaves a group
+   * in the groups section, so without this the card would keep reporting the
+   * count from before. The first focus is skipped — each hook fetches on mount.
+   */
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      void reloadGroups();
+      void reloadInvites();
+    }, [reloadGroups, reloadInvites])
+  );
 
   const availabilityGrid = useMemo(() => {
     const withSlots = userCourses.find(
@@ -56,14 +80,29 @@ export default function HomeScreen() {
           {profile?.department ?? 'Department not set'}
         </Text>
 
-        {/* Stage 2 placeholder — honest about not being built yet. */}
+        {/* Groups lead. One card either way, so the screen does not reshuffle. */}
         <View style={styles.nextCard}>
-          <Text style={styles.nextTitle}>Find a study group</Text>
-          <Text style={styles.nextBody}>
-            Matching arrives in the next build stage. Your courses and availability
-            are what it will use, so keeping them accurate now pays off later.
+          <Text style={styles.nextTitle}>
+            {groups.length === 0 ? 'Find a study group' : 'Your groups'}
           </Text>
-          <Button label="Coming in Stage 2" onPress={() => {}} disabled variant="secondary" />
+          <Text style={styles.nextBody}>
+            {groups.length === 0
+              ? 'Matching ranks groups and study partners on your courses by how much of your week lines up with theirs. You can also browse what is open, or start your own group.'
+              : `${groups.length} group${groups.length === 1 ? '' : 's'} · ${groups
+                  .slice(0, 2)
+                  .map((g) => g.group_name)
+                  .join(', ')}${groups.length > 2 ? '…' : ''}`}
+          </Text>
+          {invitations.length > 0 && (
+            <Text style={styles.inviteLine}>
+              {invitations.length} pending invitation
+              {invitations.length === 1 ? '' : 's'} waiting for an answer
+            </Text>
+          )}
+          <Button
+            label={groups.length === 0 ? 'Find a study group' : 'Open your groups'}
+            onPress={() => router.push('/(app)/groups')}
+          />
         </View>
 
         <View style={styles.sectionHeaderRow}>
@@ -113,6 +152,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.statsRow}>
+          <Stat label="Groups" value={String(groups.length)} />
           <Stat label="Courses" value={String(userCourses.length)} />
           <Stat
             label="Free slots"
@@ -158,6 +198,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
+  },
+  inviteLine: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.primary,
+    marginBottom: spacing.md,
   },
   sectionHeaderRow: {
     flexDirection: 'row',

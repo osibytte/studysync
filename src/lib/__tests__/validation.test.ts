@@ -3,6 +3,7 @@ import {
   validateDepartment,
   validateEmail,
   validateFullName,
+  validateGroupName,
   validatePassword,
   validatePasswordConfirm,
 } from '../validation';
@@ -91,6 +92,30 @@ describe('validateDepartment', () => {
 
   it('rejects over-long input', () => {
     expect(validateDepartment('x'.repeat(81))).toMatch(/too long/);
+  });
+});
+
+describe('validateGroupName', () => {
+  it('accepts an ordinary group name', () => {
+    expect(validateGroupName('CSC 201 Study Group')).toBeNull();
+    expect(validateGroupName('A')).toBeNull(); // one character passes the CHECK
+  });
+
+  it('rejects a blank name', () => {
+    expect(validateGroupName('')).toBe('Give the group a name');
+    expect(validateGroupName('   ')).toBe('Give the group a name');
+  });
+
+  it('mirrors the 80-character bound in the groups CHECK exactly', () => {
+    // Same bounds on purpose: a name the client accepts and Postgres rejects
+    // surfaces as an opaque constraint error after the round trip — and offline,
+    // not until the queue drains.
+    expect(validateGroupName('x'.repeat(80))).toBeNull();
+    expect(validateGroupName('x'.repeat(81))).toMatch(/too long/);
+  });
+
+  it('measures the trimmed name, as btrim does', () => {
+    expect(validateGroupName(`  ${'x'.repeat(80)}  `)).toBeNull();
   });
 });
 

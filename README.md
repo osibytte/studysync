@@ -1,10 +1,10 @@
-# StudySync — Stage 1: Accounts & Profiles
+# StudySync — Stages 1 & 2: Accounts, Profiles & Group Formation
 
 Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
 
-This is Stage 1 of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. Everything works offline and syncs when the connection returns.
+This is the first two stages of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. They can then be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests. Profile edits, creating a group and leaving a group all work offline and sync when the connection returns.
 
-Matching, groups, chat, materials and notifications are later stages. Home shows an honest "coming in Stage 2" placeholder rather than a button that does nothing.
+Chat, materials and notifications are later stages. Stage 2's screens are written and typechecked but have **not yet been exercised against the live database from a device** — see the end of the Stage 2 section.
 
 ## What you need
 
@@ -129,9 +129,9 @@ useEffect(() => {
 
 If you see rows, RLS is not doing its job. Check that `0002_stage1_rls.sql` ran without errors and that `pg_tables.rowsecurity` is true for every table.
 
-## Stage 2 — Group Formation (in progress)
+## Stage 2 — Group Formation
 
-The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). Run them in order after Stage 1's `0001`–`0003`.
+The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). `0009` then removed topics, and `0010` added the four read RPCs the client screens need. Run them in order after Stage 1's `0001`–`0003`.
 
 The compatibility score is a weighted sum, normalised to `[0, 1]`:
 
@@ -206,7 +206,15 @@ curl -i -X POST http://localhost:54321/functions/v1/run-batch-matching \
 
 The response is a run summary: `pool_size`, the `groups` formed (each with its members' names and ids, a size, and a `cohesion` score) and any `waiting` leftover. Names and ids are fine here — the caller is the trusted operator, not a student, so none of `find-group`'s privacy masking applies. A non-`service_role` token gets a `403`; a pool below `min_pool` returns `ran: false` with a reason and forms nothing. Re-running is self-healing: students just grouped drop out of the next pool, so a second run only regroups whoever is still waiting.
 
-Still to build for Stage 2: the client screens (discover, group detail, invitations, join requests, create group) and Pathway Two's self-organized flow. The home screen still shows the honest "coming in Stage 2" placeholder until those land.
+### The client screens
+
+`app/(app)/groups/` holds the Stage 2 UI: the list of your groups, create, browse (`discover`), matching (`match`), invitations, a group detail screen, and invite-a-student. `src/lib/groups.ts` is one typed wrapper per RPC; `src/lib/groupRules.ts` holds the status vocabulary, capacity phrasing and can-I-do-this predicates the screens share, unit-tested against the SQL rules they mirror.
+
+**Migration `0010` exists because of a name-resolution gap.** Stage 1's RLS on `users` is own-row only, which is the right default — a student must not be able to enumerate the student body. Stage 2's policies let a member read `group_members` (ids and roles) and their own invitations, but not the *names* behind those ids, so the roster and invitation screens had nothing to render. Widening the `users` policy would have fixed the screens and broken the privacy posture. Instead `0010` follows the precedent `search_students` already set: four SECURITY DEFINER `stable` reads, each gated on an explicit membership check, each returning **name and department only** — `group_members_detail`, `group_common_availability`, `my_invitations`, `group_join_requests`.
+
+**Only creating and leaving a group work offline.** Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting and matching are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id.
+
+**Still unverified:** no Stage 2 RPC has been called from a real device yet. `npm test` covers the pure rules and `npm run typecheck` is green, but the end-to-end walk — two accounts on one course, both pathways, then the offline cases — is the next thing to do. `HANDOFF.md` §7 has the script for it.
 
 ## Layout
 
@@ -215,15 +223,22 @@ app/                      expo-router routes
   _layout.tsx             providers + auth route guard
   (auth)/                 login, signup
   (onboarding)/           profile → courses → availability
-  (app)/                  home, profile
+  (app)/                  home, profile, courses
+    groups/               list, create, discover, match, invitations,
+                          [groupId]/ detail + invite
 src/
-  components/             Button, TextField, Screen, AvailabilityGrid, OfflineBanner
+  components/             Button, TextField, Screen, AvailabilityGrid,
+                          OfflineBanner, CourseChips, StatusPill
   context/                AuthContext, NetworkContext
-  hooks/                  useCourses, useUserCourses
+  hooks/                  useCourses, useUserCourses, useMyGroups, useDiscover,
+                          useGroupDetail, useInvitations
   lib/
     supabase.ts           client + error mapping
     availability.ts       bitmask encoding, overlap scoring, group common grid
     matching.ts           compatibility scoring (mirrored to the Edge Function)
+    groups.ts             typed wrappers over the Stage 2 RPCs
+    groupRules.ts         shared group vocabulary + permission predicates
+    ids.ts                client action ids for the offline ledger
     cache.ts              offline read cache
     outbox.ts             offline write queue
     validation.ts         form rules
@@ -232,7 +247,7 @@ src/
     database.ts           schema types (Stage 1 + Stage 2 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS (0001–0009)
+  migrations/             schema + RLS + RPCs (0001–0010)
   seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts
@@ -261,15 +276,17 @@ Found during spec review; the feature logic requires them:
 - `applied_client_actions` — idempotency ledger for offline replay
 - `users.onboarding_complete` — gates routing; computing it on every read would mean three queries before the router can decide anything
 
-Still to add in Stage 2: `invitations` and `join_requests` tables, and `groups.is_discoverable`, `last_activity_at`, `max_members`.
+`invitations` and `join_requests`, plus `groups.is_discoverable` / `last_activity_at` / `max_members`, were the same kind of find for Stage 2 — all added in `0004`.
 
 ## Known gaps at this stage
 
 Availability edits apply to every enrolled course at once. Intentional for now, per above.
 
-Home is a Stage 1 endpoint. It shows the profile and routes to editing; matching is Stage 2.
+**`create_group` does not check that the creator is enrolled in the course.** The client only ever offers enrolled courses, and everything that fills a group afterwards is course-scoped — `discover_groups` lists it to that course's students, `search_students` only finds them, matching only scores them — so the practical result of getting past the UI would be a group nobody can find. Closing it in SQL means a forward-only `0011`; worth doing before Stage 3.
 
-## Before Stage 2
+**`set_matching_pref` has no screen.** The RPC (`0007`) and its wrapper exist, so a student cannot yet opt out of system batch matching from the app.
+
+## Before Stage 3
 
 Two things worth knowing now rather than later:
 
@@ -277,4 +294,4 @@ Two things worth knowing now rather than later:
 
 **Expo Go on Android dropped remote push notification support in SDK 53.** Stages 1–4 test fine in Expo Go. Stage 5 will need an EAS dev build on your phone. Nothing to do about it now, but it is not a surprise you want at Stage 5.
 
-Stage 2 also needs three things resolved that Stage 1 did not touch: `Sessions` has no roadmap stage despite the Active lifecycle state and all time-based notifications depending on it (I would slot it after Materials), Stage 4's "upload fires a notification" needs Stage 4 writing `Notifications` rows with Stage 5 adding delivery on top, and RLS on `group_members` will need a `security definer` helper to avoid infinite recursion when its policy queries its own table.
+Two of the three cross-stage questions Stage 1 left open are still open: `Sessions` has no roadmap stage despite the Active lifecycle state and all time-based notifications depending on it (I would slot it after Materials), and Stage 4's "upload fires a notification" needs Stage 4 writing `Notifications` rows with Stage 5 adding delivery on top. The third is settled — `0005` added the `is_group_member` / `is_group_creator` SECURITY DEFINER helpers, so no `group_members` policy queries its own table.
