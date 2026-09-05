@@ -1,10 +1,12 @@
-# StudySync — Stages 1 & 2: Accounts, Profiles & Group Formation
+# StudySync — Accounts, Groups, the Group Timeline, Shared Files, and Study Alarms
 
 Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
 
-This is the first two stages of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. They can then be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests. Profile edits, creating a group, leaving a group, and choosing whether a course opts into automatic matching all work offline and sync when the connection returns.
+Four of a five-stage build are complete, and the fifth is half done. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid (**Stage 1**). They can be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests (**Stage 2**). Inside a group there is a timeline: chat, plus study times proposed, agreed and cancelled in it (**Stage 3**), and files shared from the same timeline into a private bucket, with their own tab (**Stage 4**). And the phone now rings **30 minutes before a study time the group agreed on**, from the OS rather than a server, so it works with no signal and the app closed (**Stage 5**, its local half).
 
-Chat, materials and notifications are later stages. Stage 2's screens are written and typechecked but have **not yet been exercised against the live database from a device** — see the end of the Stage 2 section.
+What is left of Stage 5 is everything with a server in it: the notification ledger, a preferences screen and in-app inbox, and remote push for chat, file and invitation activity — that last part is the only thing in the project needing an EAS development build.
+
+Profile edits, creating a group, leaving a group, choosing whether a course opts into automatic matching, sending a message, proposing a study time and answering one all work offline and sync when the connection returns. `HANDOFF.md` is the full engineering record; this file is orientation and setup.
 
 ## What you need
 
@@ -29,13 +31,15 @@ At supabase.com, create a project. Note the region — pick the closest one to N
 
 ### 3. Run the migrations
 
-Supabase dashboard → SQL Editor → New query. Run these three files in order, each as a separate query:
+Supabase dashboard → SQL Editor → New query. Run every file **in numerical order**, each as a separate query — the first three being:
 
 1. `supabase/migrations/0001_stage1_schema.sql` — tables, triggers, the overlap function
 2. `supabase/migrations/0002_stage1_rls.sql` — row level security policies
 3. `supabase/seed/0003_seed_courses.sql` — placeholder courses
 
-Order matters: 0002 adds policies to tables 0001 creates, and 0003 inserts into them.
+…then `0004` through `0018` from `supabase/migrations/`. The seed took the number `0003`, so the migrations skip it; nothing is missing.
+
+Order matters throughout, and migrations are **forward-only** — an applied file is never edited, which is why a few of them still carry comments naming things a later one dropped or renamed. `0002` adds policies to tables `0001` creates and the seed inserts into them; `0005` adds policies to `0004`'s tables; `0018` fixes a gap in `0017`'s Storage policies. Filenames record when a file was written rather than which stage owns it, so `0017_stage3_materials.sql` and `0018_stage3_storage_readback.sql` are in fact Stage 4's backend.
 
 **The seed data is placeholder.** The course codes follow the usual Nigerian convention, but I have not seen the UI syllabus. Check every row against the real course catalogue before your pilot — matching only ever compares students enrolled in the same course, so a wrong or missing course code silently keeps compatible students apart.
 
@@ -69,7 +73,9 @@ Scan the QR with Expo Go. If you change `.env`, restart with `npx expo start --c
 npm test
 ```
 
-Covers the availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names) and profile validation. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
+405 tests in 8 suites. The availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names), profile validation, the compatibility scorer, the group vocabulary, the chat and materials rules, and the notification rules. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
+
+**A green suite cannot see a bundling failure**, because `jest-expo` resolves modules through its own preset and never reads `metro.config.js` — which is how this project once had 325 passing tests and an app that would not bundle on either platform. `HANDOFF.md` §4 has the four-part health check, including how to ask Metro for each platform's bundle directly.
 
 ```bash
 npm run typecheck
@@ -84,6 +90,8 @@ Time yourself against the 5-minute onboarding target:
 3. Pick two or three courses
 4. Set availability — tap a day name to fill the whole column
 5. Land on home and confirm it reflects your courses and availability
+
+Then, for the later stages: open a group, send a message, propose a study time **at least 31 minutes out**, answer *yes* (the one tap that asks for notification permission), and share a file. `HANDOFF.md` §7 walks each of these as a numbered pathway, including what is still unproven on a real device.
 
 ### Offline behaviour
 
@@ -221,7 +229,33 @@ The response is a run summary: `pool_size`, the `groups` formed (each with its m
 
  Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting and matching are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id. `matching.pref` is safe on the opposite reasoning: it hands out no seat, nobody has to answer it, and it only takes effect the next time an operator runs batch matching — so a change that lands minutes later is honoured in full.
 
-**Verified against the live project, 2026-09-05.** Every Stage 2 RPC was driven with two throwaway accounts over PostgREST using real user JWTs — the same wire supabase-js uses, so argument names, return shapes, table grants and RLS were all under test. Both pathways end to end, the creator-only refusals, an idempotent replay of `create_group`, disband-on-empty, both hooks' embedded selects, and `find-group`'s first real caller all behaved as written. `0011` was then verified the same way: each of the five gates refused with its own message, a refused `create_group` left no `groups` row behind (the raise rolls the ledger claim back with it), approving a requester who had since dropped the course and accepting an invitation after dropping were both refused while *declining* still worked, and `anon` cannot call `is_enrolled` at all. `set_matching_pref` was checked for the property its offline queueing rests on — a replay under the same `p_client_action_id` is a no-op even with the opposite value, a fresh id applies, and an invalid preference raises without leaving a ledger row, so a retry is possible. `0012` was verified on a four-member group built one member at a time, with the member masks chosen so each threshold produces a different answer: at two members the mask is now the intersection `1100000011000000110000000000` where `0010` returned the union, three members requires all three, the fourth restores the majority (threshold 2), a member who drops the course stops being counted at all (`members_counted` 3 of a roster of 4, threshold 3), a group with no enrolled members returns an empty mask with both numbers 0, and `anon` gets `401` / `42501 permission denied for function` rather than a mask. All test rows and users were deleted afterwards. **Still unverified: the UI itself** — no Stage 2 screen has been touched by a finger, and the offline queue has not drained on a real phone. `HANDOFF.md` §7 has the walkthrough.
+**Verified against the live project, 2026-09-05.** Every Stage 2 RPC was driven with two throwaway accounts over PostgREST using real user JWTs — the same wire supabase-js uses, so argument names, return shapes, table grants and RLS were all under test. Both pathways end to end, the creator-only refusals, an idempotent replay of `create_group`, disband-on-empty, both hooks' embedded selects, and `find-group`'s first real caller all behaved as written. `0011` was then verified the same way: each of the five gates refused with its own message, a refused `create_group` left no `groups` row behind (the raise rolls the ledger claim back with it), approving a requester who had since dropped the course and accepting an invitation after dropping were both refused while *declining* still worked, and `anon` cannot call `is_enrolled` at all. `set_matching_pref` was checked for the property its offline queueing rests on — a replay under the same `p_client_action_id` is a no-op even with the opposite value, a fresh id applies, and an invalid preference raises without leaving a ledger row, so a retry is possible. `0012` was verified on a four-member group built one member at a time, with the member masks chosen so each threshold produces a different answer: at two members the mask is now the intersection `1100000011000000110000000000` where `0010` returned the union, three members requires all three, the fourth restores the majority (threshold 2), a member who drops the course stops being counted at all (`members_counted` 3 of a roster of 4, threshold 3), a group with no enrolled members returns an empty mask with both numbers 0, and `anon` gets `401` / `42501 permission denied for function` rather than a mask. All test rows and users were deleted afterwards. **The UI has since been driven on a real iPhone (2026-09-05):** sign-in, onboarding, group creation and chat all behaved. **What a finger still has not touched:** sharing a file (the multipart upload has been read but never run), Realtime between two phones, the offline queue draining after a genuine disconnect, and the 30-minute alarm firing in airplane mode. `HANDOFF.md` §7 has a numbered walkthrough for each.
+
+## Stage 3 — the group timeline
+
+A group has one screen where things happen: `app/(app)/groups/[groupId]/chat.tsx`. Messages and study times share it, ordered together, because a proposal is something the group says to each other — splitting them into a "chat" tab and a "schedule" tab would hide the discussion that produced the plan.
+
+**A study time is proposed in the timeline and answered there.** Anyone proposes a start, an end and an optional place; every member answers yes, no or maybe; the card shows the tally and, once enough people are in, the session flips to `confirmed`. Cancelling puts a cancellation in the timeline rather than making the card vanish, so a member who was offline can see what happened and why. `src/lib/chatRules.ts` holds the parts worth testing on their own — how consecutive messages from one person group into a block, where day dividers fall, and the RSVP vocabulary the card renders — which is what lets the screen stay a thin renderer.
+
+**Sending a message, proposing a study time and answering one all work offline**, queued in the same outbox on the same client-action-id idempotency as a profile edit — they are the three things a student does most, and each is safe to replay. **Cancelling** a session, **deleting** a message and **sharing a file** are online-only and say so on the button: cancelling and deleting change what other people are looking at, and a file upload has bytes to move.
+
+**Realtime's live edge is deliberately narrow.** Only `messages` is subscribed to. Study times and files are read through SECURITY DEFINER RPCs that join in the proposer's name, the uploader's name, the yes-tally and the threshold a card renders — none of which travels on a replicated row — so a card built from the raw row would be missing most of its own text. A new message therefore arrives live, and when it is a session or file message the hook refetches the lists behind it. Something that changes with no message attached, like another member answering a study time, is caught on the next focus instead.
+
+## Stage 4 — shared files
+
+Files are shared from the timeline, so a lecture slide arrives in the conversation it belongs to, and they collect in their own tab (`[groupId]/files.tsx`) for the times you are looking for a file rather than reading back. There is no separate materials module: a shared file **is** a timeline entry, so `src/lib/chat.ts` carries the Storage work alongside messages and sessions, and `src/lib/chatRules.ts` holds the upload rules (`validateUpload`, `fileKind`, `formatFileSize`, `materialStoragePath`) next to the message and session rules. `src/lib/filePicker.ts` is the one piece that is genuinely its own concern — getting a file off the device.
+
+**The bucket is private.** Nothing is served by a public URL; every read goes through a signed URL minted for that member at that moment, and the Storage policies check group membership rather than trusting the path. A private bucket plus signed reads is the only arrangement where leaving a group actually revokes access to the group's files.
+
+## Stage 5 — notifications and the study alarm
+
+Half of this stage is built and needs no development build; the other half needs one. The split is not arbitrary — it is the local/remote line described under [Before the pilot](#before-the-pilot).
+
+**Built: the 30-minute alarm.** When a group confirms a study time, this phone asks the OS to wake it 30 minutes before the start. Because the OS holds the schedule, the alert arrives with no signal, with the app force-closed, and after a reboot. `src/lib/notificationRules.ts` decides which alarms are owed (a pure module, 80 tests), `src/lib/notifier.ts` is the only file allowed to talk to `expo-notifications`, and `src/lib/reminders.ts` reconciles the two — re-running whenever the app comes to the foreground, comes online, or finishes draining its outbox, so cancelling a session clears its alarm.
+
+The rule most likely to look like a bug: **a session must start at least 31 minutes from now to get an alarm** (a 30-minute lead plus a 60-second floor). Propose something 20 minutes out and nothing is scheduled, by design. And the permission prompt appears at exactly one moment — the tap that answers *yes* to a study time — because that is the one point where a student has just said they intend to be somewhere.
+
+**Not built yet:** the notification ledger and its RLS, a preferences screen and in-app inbox, and remote push for chat, file and invitation activity. That last piece is what the EAS development build is for.
 
 ## Layout
 
@@ -232,35 +266,50 @@ app/                      expo-router routes
   (onboarding)/           profile → courses → availability
   (app)/                  home, profile, courses
     groups/               list, create, discover, match, matching,
-                          invitations, [groupId]/ detail + invite
+                          invitations, [groupId]/ detail + invite,
+                          [groupId]/chat (timeline), [groupId]/files
 src/
   components/             Button, TextField, Screen, AvailabilityGrid,
-                          OfflineBanner, CourseChips, StatusPill
+                          OfflineBanner, CourseChips, StatusPill, StepHeader,
+                          MessageBubble, SessionCard, ProposeTimeSheet,
+                          FileCard, Composer
   context/                AuthContext, NetworkContext
   hooks/                  useCourses, useUserCourses, useMyGroups, useDiscover,
-                          useGroupDetail, useInvitations
+                          useGroupDetail, useInvitations, useMessages,
+                          useSessionAttendees, useMaterials, useUnread,
+                          useReminders
   lib/
     supabase.ts           client + error mapping
     availability.ts       bitmask encoding, overlap scoring, group common grid
     matching.ts           compatibility scoring (mirrored to the Edge Function)
     groups.ts             typed wrappers over the Stage 2 RPCs
     groupRules.ts         shared group vocabulary + permission predicates
+    chat.ts               messages, study times, RSVPs, shared files,
+                          Realtime subscribe — the whole timeline's network layer
+    chatRules.ts          timeline grouping, day dividers, RSVP vocabulary,
+                          proposal validation, upload + file-kind rules (pure)
+    filePicker.ts         getting a file off the device
+    notificationRules.ts  which alarms are owed, and when (pure)
+    notifier.ts           the ONLY file that may touch expo-notifications
+    reminders.ts          fetch → remember → reconcile with the OS
     ids.ts                client action ids for the offline ledger
     cache.ts              offline read cache
     outbox.ts             offline write queue
     validation.ts         form rules
     __tests__/            unit tests (incl. mirror-drift guard)
   types/
-    database.ts           schema types (Stage 1 + Stage 2 tables)
+    database.ts           schema types (Stages 1–4 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS + RPCs (0001–0012)
+  migrations/             schema + RLS + RPCs (0001–0018; no 0003, that is the seed)
   seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts
     find-group/           Pathway One matching Edge Function
     run-batch-matching/   admin-initiated batch matching Edge Function
 ```
+
+`notifier.ts` being the single importer of `expo-notifications` is an invariant, not a convention — `HANDOFF.md` §6 invariant 9 says why, and §8 has the four-step crash it protects against.
 
 ## Decisions worth knowing
 
@@ -293,12 +342,12 @@ Availability edits apply to every enrolled course at once. Intentional for now, 
 
 **Closed since the first draft of this file:** the enrolment gap in the write RPCs (`0011`), the shared-time rule that called two people a majority of two (`0012`), the missing `set_matching_pref` screen (`app/(app)/groups/matching.tsx`), and the two functions that shared a name while applying different rules (the TS scorer is now `groupScheduleProfile`) — all described in the Stage 2 section.
 
-## Before Stage 3
-
-Two things worth knowing now rather than later:
+## Before the pilot
 
 **Supabase pauses free projects after about a week of inactivity.** Fine during the build, but during a two-week pilot a quiet weekend could pause the project mid-pilot. Open the dashboard periodically, or plan to upgrade for the pilot window.
 
-**Expo Go on Android dropped remote push notification support in SDK 53.** Stages 1–4 test fine in Expo Go. Stage 5 will need an EAS dev build on your phone. Nothing to do about it now, but it is not a surprise you want at Stage 5.
+**Expo Go on Android dropped *remote* push in SDK 53 — but not local notifications.** This distinction decides how much of Stage 5 you can test today, so it is worth holding onto. A notification the OS schedules on the device (`scheduleNotificationAsync` with a date trigger) works in Expo Go on both platforms, which is why the 30-minute study alarm is finished and testable **now**, with no build. A notification a server sends does not, on Android, and importing `expo-notifications` carelessly in Expo Go on Android **throws at module scope rather than warning** — hence `notifier.ts`. Only the remote half — chat, file and invitation push — needs an EAS development build.
 
-Two of the three cross-stage questions Stage 1 left open are still open: `Sessions` has no roadmap stage despite the Active lifecycle state and all time-based notifications depending on it (I would slot it after Materials), and Stage 4's "upload fires a notification" needs Stage 4 writing `Notifications` rows with Stage 5 adding delivery on top. The third is settled — `0005` added the `is_group_member` / `is_group_creator` SECURITY DEFINER helpers, so no `group_members` policy queries its own table.
+**The 30-minute alarm rings at alarm volume, not with an alarm ringtone.** Android exposes the audio stream through the notification channel, so the reminder is as loud as an alarm; the *tone* is still the notification tone until a sound file is bundled, which needs a dev build. On iOS, a phone whose ringer switch is off shows a silent banner — only Apple's critical-alerts entitlement overrides the mute switch, and it is granted by individual application. Both limits are deliberate and recorded in `HANDOFF.md` §8.
+
+All three cross-stage questions Stage 1 left open are now settled. Study times never became their own stage: they live inside the group timeline, proposed and agreed in chat (Stage 3), which is where a group actually decides to meet. "Upload fires a notification" splits as planned — Stage 4 records the material, Stage 5 delivers on top. And `0005`'s `is_group_member` / `is_group_creator` SECURITY DEFINER helpers mean no `group_members` policy queries its own table.
