@@ -22,7 +22,6 @@ const PREFIX = 'studysync:cache:v1';
 
 export const CacheKeys = {
   courses: () => `${PREFIX}:courses`,
-  topics: (courseId: string) => `${PREFIX}:topics:${courseId}`,
   profile: (userId: string) => `${PREFIX}:user:${userId}:profile`,
   userCourses: (userId: string) => `${PREFIX}:user:${userId}:courses`,
 } as const;

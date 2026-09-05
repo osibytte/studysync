@@ -4,11 +4,11 @@ import { supabase } from '@/lib/supabase';
 import type { UserCourseWithDetail } from '@/types/database';
 
 /**
- * The signed-in student's enrolments, with course details and topic selections.
+ * The signed-in student's enrolments, with course details.
  *
- * One query with nested selects rather than three round trips. On a slow
+ * One query with a nested select rather than two round trips. On a slow
  * connection each additional request is a separate chance to fail, and this
- * screen needs all three pieces before it can render anything useful.
+ * screen needs both pieces before it can render anything useful.
  *
  * Cache-first for the same reason as useCourses, but more important here: this
  * is the student's own data, and it must be visible offline.
@@ -60,9 +60,6 @@ export function useUserCourses(userId: string | null): State {
           course_title,
           department,
           created_at
-        ),
-        user_course_topics (
-          topic_id
         )
       `
       )
@@ -76,13 +73,7 @@ export function useUserCourses(userId: string | null): State {
       return;
     }
 
-    /**
-     * Flatten the nested join into the shape the UI wants.
-     *
-     * Supabase returns `user_course_topics` as an array of objects; the screens
-     * want a plain string[] of topic ids so selection state is a simple
-     * includes() check rather than a find().
-     */
+    // Flatten the nested join into the shape the UI wants.
     const shaped: UserCourseWithDetail[] = (data ?? []).map((row: any) => ({
       user_course_id: row.user_course_id,
       user_id: row.user_id,
@@ -92,7 +83,6 @@ export function useUserCourses(userId: string | null): State {
       matching_pref: row.matching_pref ?? 'system',
       created_at: row.created_at,
       course: row.course,
-      topic_ids: (row.user_course_topics ?? []).map((t: any) => t.topic_id),
     }));
 
     // Sort client-side: ordering by a joined column in PostgREST is awkward,

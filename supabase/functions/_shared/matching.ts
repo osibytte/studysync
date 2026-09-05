@@ -17,6 +17,7 @@
 
 import {
   type AvailabilityGrid,
+  countSelected,
   overlapCount,
   scheduleOverlapScore,
 } from './availability.ts';
@@ -28,15 +29,14 @@ import {
 // the enclosed text and fails the build on any drift. Change one, change both.
 
 /**
- * Spec weights. Topic fit matters most (you're there to study the same thing),
- * schedule next (you have to actually meet), and a small nudge toward filling a
- * group that's nearly complete.
+ * Spec weights. Matching is by course + availability, so schedule overlap
+ * dominates (you have to actually meet), with a small nudge toward filling a
+ * group that's nearly complete. The two weights sum to 1, keeping score in [0, 1].
  */
-export const WEIGHTS = { topic: 0.5, schedule: 0.3, fill: 0.2 } as const;
+export const WEIGHTS = { schedule: 0.8, fill: 0.2 } as const;
 
 /** The requesting student, reduced to what scoring needs. */
 export interface ScoringProfile {
-  topicIds: string[];
   availability: AvailabilityGrid;
 }
 
@@ -46,7 +46,6 @@ export interface ScoringProfile {
  * uniformly; the caller shapes DB rows into this and carries any identity
  * (group id, name, …) alongside separately.
  *
- *   topicIds      the group's topics (or the other student's)
  *   availability  a representative availability grid for the candidate — for a
  *                 group, the slots its members can commonly meet; for a lone
  *                 student, that student's own grid. The caller decides how to
@@ -57,37 +56,9 @@ export interface ScoringProfile {
  *                 with)
  */
 export interface Candidate {
-  topicIds: string[];
   availability: AvailabilityGrid;
   memberCount: number;
   maxMembers: number;
-}
-
-/**
- * Topic overlap in [0, 1], normalised by the SMALLER topic set — the same
- * reasoning as scheduleOverlapScore's min-count denominator. A student who
- * lists 2 topics and shares both with a group that lists 8 is a perfect topic
- * fit *from that student's point of view*; dividing by the larger set would
- * unfairly punish focused students against broad groups.
- *
- * Returns 0 when either side lists no topics — no shared basis to score on, and
- * it keeps the divisor non-zero.
- */
-export function topicOverlapScore(a: string[], b: string[]): number {
-  if (a.length === 0 || b.length === 0) return 0;
-  const bSet = new Set(b);
-  let shared = 0;
-  for (const t of a) if (bSet.has(t)) shared++;
-  return shared / Math.min(a.length, b.length);
-}
-
-/** Count of shared topics — for the human-readable breakdown on a match card. */
-export function sharedTopicCount(a: string[], b: string[]): number {
-  if (a.length === 0 || b.length === 0) return 0;
-  const bSet = new Set(b);
-  let shared = 0;
-  for (const t of a) if (bSet.has(t)) shared++;
-  return shared;
 }
 
 /**
@@ -109,10 +80,8 @@ export function groupFillBonus(memberCount: number, maxMembers: number): number 
 /** The score plus its parts, for display and for tests to pin. */
 export interface MatchBreakdown {
   score: number;
-  topicScore: number;
   scheduleScore: number;
   fillScore: number;
-  sharedTopics: number;
   sharedSlots: number;
 }
 
@@ -121,21 +90,15 @@ export function scoreBreakdown(
   requester: ScoringProfile,
   candidate: Candidate
 ): MatchBreakdown {
-  const topicScore = topicOverlapScore(requester.topicIds, candidate.topicIds);
   const scheduleScore = scheduleOverlapScore(requester.availability, candidate.availability);
   const fillScore = groupFillBonus(candidate.memberCount, candidate.maxMembers);
 
-  const score =
-    WEIGHTS.topic * topicScore +
-    WEIGHTS.schedule * scheduleScore +
-    WEIGHTS.fill * fillScore;
+  const score = WEIGHTS.schedule * scheduleScore + WEIGHTS.fill * fillScore;
 
   return {
     score,
-    topicScore,
     scheduleScore,
     fillScore,
-    sharedTopics: sharedTopicCount(requester.topicIds, candidate.topicIds),
     sharedSlots: overlapCount(requester.availability, candidate.availability),
   };
 }
@@ -152,10 +115,10 @@ export function compatibilityScore(
 export type ScoredCandidate<T extends Candidate> = T & { match: MatchBreakdown };
 
 /**
- * Score and rank candidates, best first. Ties break by shared topics then
- * shared slots then fuller group, so ordering is stable and explainable rather
- * than dependent on input order. Returns [] for no candidates — the caller's
- * cue to show the no-match fallback.
+ * Score and rank candidates, best first. Ties break by shared slots then fuller
+ * group, so ordering is stable and explainable rather than dependent on input
+ * order. Returns [] for no candidates — the caller's cue to show the no-match
+ * fallback.
  */
 export function rankCandidates<T extends Candidate>(
   requester: ScoringProfile,
@@ -165,8 +128,6 @@ export function rankCandidates<T extends Candidate>(
     .map((c) => ({ ...c, match: scoreBreakdown(requester, c) }))
     .sort((a, b) => {
       if (b.match.score !== a.match.score) return b.match.score - a.match.score;
-      if (b.match.sharedTopics !== a.match.sharedTopics)
-        return b.match.sharedTopics - a.match.sharedTopics;
       if (b.match.sharedSlots !== a.match.sharedSlots)
         return b.match.sharedSlots - a.match.sharedSlots;
       return b.match.fillScore - a.match.fillScore;
@@ -213,13 +174,17 @@ function clampSize(v: number, lo: number, hi: number): number {
   return r;
 }
 
-/** Index of the seed: most topics anchors the group; id breaks ties for stable runs. */
+/**
+ * Index of the seed: the student with the most availability anchors the group,
+ * giving fillers the widest schedule to overlap against; id breaks ties so runs
+ * are stable.
+ */
 function pickSeedIndex(pool: PartitionMember[]): number {
   let best = 0;
   for (let i = 1; i < pool.length; i++) {
-    const iTopics = pool[i].profile.topicIds.length;
-    const bTopics = pool[best].profile.topicIds.length;
-    if (iTopics > bTopics || (iTopics === bTopics && pool[i].id < pool[best].id)) {
+    const iSlots = countSelected(pool[i].profile.availability);
+    const bSlots = countSelected(pool[best].profile.availability);
+    if (iSlots > bSlots || (iSlots === bSlots && pool[i].id < pool[best].id)) {
       best = i;
     }
   }
@@ -231,10 +196,11 @@ function pickSeedIndex(pool: PartitionMember[]): number {
  *
  * Used by admin-initiated batch (system) matching: given everyone waiting to be
  * matched on a course, carve them into groups. Greedy seed-and-fill — pick a
- * seed (the student with the most topics, so the group is anchored on clear
- * interests), fill it with that seed's best matches via rankCandidates, remove
- * them, repeat. A star-shaped heuristic (members are scored to the seed, not
- * pairwise across the whole group): good enough for a pilot, and cheap (O(n^2)).
+ * seed (the student with the most availability, so the group is anchored on the
+ * widest schedule), fill it with that seed's best matches via rankCandidates,
+ * remove them, repeat. A star-shaped heuristic (members are scored to the seed,
+ * not pairwise across the whole group): good enough for a pilot, and cheap
+ * (O(n^2)).
  *
  * Group size varies: a random target in [targetMin, targetMax] per group. Two
  * rules keep the tail sane, per the product decision:
@@ -274,12 +240,11 @@ export function partitionIntoGroups(
 
     // Score the rest against the seed. memberCount/maxMembers are a constant
     // fill context here (the group is still forming), so they don't change the
-    // ranking — topic + schedule fit to the seed does.
+    // ranking — schedule fit to the seed does.
     const ranked = rankCandidates(
       seed.profile,
       pool.map((m) => ({
         id: m.id,
-        topicIds: m.profile.topicIds,
         availability: m.profile.availability,
         memberCount: 1,
         maxMembers: targetMax,

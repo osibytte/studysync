@@ -19,14 +19,6 @@ export interface Course {
   created_at: string;
 }
 
-export interface Topic {
-  topic_id: string;
-  course_id: string;
-  topic_name: string;
-  sort_order: number;
-  created_at: string;
-}
-
 export interface NotificationPrefs {
   /** 'HH:MM' 24h. Quiet hours may wrap midnight (22:00 -> 07:00). */
   quiet_hours_start: string;
@@ -72,11 +64,6 @@ export interface UserCourse {
   created_at: string;
 }
 
-export interface UserCourseTopic {
-  user_course_id: string;
-  topic_id: string;
-}
-
 export type DevicePlatform = 'ios' | 'android';
 
 export interface DevicePushToken {
@@ -89,16 +76,12 @@ export interface DevicePushToken {
 }
 
 /**
- * Composite shapes the UI actually renders — a course plus the student's
- * selections for it. Assembled client-side from joined queries.
+ * Composite shape the UI actually renders — a course plus the student's
+ * enrolment detail for it (availability, matching preference). Assembled
+ * client-side from joined queries.
  */
 export interface UserCourseWithDetail extends UserCourse {
   course: Course;
-  topic_ids: string[];
-}
-
-export interface CourseWithTopics extends Course {
-  topics: Topic[];
 }
 
 /** Defaults for a fresh profile, matching the SQL column default. */
@@ -173,15 +156,10 @@ export interface JoinRequest {
   responded_at: string | null;
 }
 
-export interface GroupTopic {
-  group_id: string;
-  topic_id: string;
-}
-
 /**
- * Return row of the `discover_groups(p_course_id, p_topic_ids, p_only_open)`
- * RPC in 0005. Not a table — a server-side projection that exposes safe
- * aggregates (member_count, matched_topics) without leaking the member roster.
+ * Return row of the `discover_groups(p_course_id, p_only_open)` RPC in 0005
+ * (topic filtering removed in 0009). Not a table — a server-side projection that
+ * exposes safe aggregates (member_count) without leaking the member roster.
  */
 export interface DiscoverGroupRow {
   group_id: string;
@@ -190,8 +168,6 @@ export interface DiscoverGroupRow {
   status: GroupStatus;
   member_count: number;
   max_members: number;
-  /** Count of the caller's supplied topic filter that this group shares. */
-  matched_topics: number;
   already_requested: boolean;
 }
 

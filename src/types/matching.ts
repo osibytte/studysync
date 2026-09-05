@@ -5,16 +5,14 @@
  *
  * Privacy posture (mirrors the search_students RPC): suggested partners and
  * group members are exposed by name and department only — never email, never a
- * raw availability mask or topic-id list. The function returns pre-computed,
- * human-readable summaries (a score, shared counts, a slot description) so the
- * client can render a match card without ever holding another student's data.
+ * raw availability mask. The function returns pre-computed, human-readable
+ * summaries (a score, shared counts, a slot description) so the client can
+ * render a match card without ever holding another student's data.
  */
 
 /** The requester's own inputs, echoed back so the UI can explain a weak match. */
 export interface FindGroupRequester {
   course_id: string;
-  /** How many topics the requester listed for this course. */
-  topic_count: number;
   /** How many availability slots the requester has for this course. */
   slot_count: number;
 }
@@ -22,10 +20,8 @@ export interface FindGroupRequester {
 /** The score breakdown surfaced on a match card. All terms are in [0, 1]. */
 export interface MatchSummary {
   score: number;
-  topic_score: number;
   schedule_score: number;
   fill_score: number;
-  shared_topics: number;
   shared_slots: number;
 }
 

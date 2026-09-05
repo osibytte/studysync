@@ -33,11 +33,6 @@ export default function HomeScreen() {
     await reload();
   }, [syncNow, reload]);
 
-  const totalTopics = useMemo(
-    () => userCourses.reduce((n, uc) => n + uc.topic_ids.length, 0),
-    [userCourses]
-  );
-
   const availabilityGrid = useMemo(() => {
     const withSlots = userCourses.find(
       (uc) => countSelected(decodeAvailability(uc.availability)) > 0
@@ -65,7 +60,7 @@ export default function HomeScreen() {
         <View style={styles.nextCard}>
           <Text style={styles.nextTitle}>Find a study group</Text>
           <Text style={styles.nextBody}>
-            Matching arrives in the next build stage. Your courses, topics and availability
+            Matching arrives in the next build stage. Your courses and availability
             are what it will use, so keeping them accurate now pays off later.
           </Text>
           <Button label="Coming in Stage 2" onPress={() => {}} disabled variant="secondary" />
@@ -90,31 +85,18 @@ export default function HomeScreen() {
           </Text>
         ) : (
           userCourses.map((uc) => (
-            <Pressable
+            <View
               key={uc.user_course_id}
               style={styles.courseCard}
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/topics',
-                  params: { userCourseId: uc.user_course_id, courseId: uc.course_id },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel={`${uc.course?.course_code}, ${uc.topic_ids.length} topics selected. Tap to change topics.`}
+              accessibilityLabel={`${uc.course?.course_code}, ${uc.course?.course_title}`}
             >
               <View style={styles.courseTextCol}>
                 <Text style={styles.courseCode}>{uc.course?.course_code}</Text>
                 <Text style={styles.courseTitle} numberOfLines={1}>
                   {uc.course?.course_title}
                 </Text>
-                <Text style={styles.courseMeta}>
-                  {uc.topic_ids.length === 0
-                    ? 'No topics picked — tap to add'
-                    : `${uc.topic_ids.length} topic${uc.topic_ids.length === 1 ? '' : 's'}`}
-                </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
+            </View>
           ))
         )}
 
@@ -132,7 +114,6 @@ export default function HomeScreen() {
 
         <View style={styles.statsRow}>
           <Stat label="Courses" value={String(userCourses.length)} />
-          <Stat label="Topics" value={String(totalTopics)} />
           <Stat
             label="Free slots"
             value={availabilityGrid ? String(countSelected(availabilityGrid)) : '0'}
@@ -213,8 +194,6 @@ const styles = StyleSheet.create({
   courseTextCol: { flex: 1 },
   courseCode: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: 2 },
-  courseMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs },
-  chevron: { fontSize: fontSize.xl, color: colors.borderStrong, paddingHorizontal: spacing.sm },
   availCard: { padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md },
   availText: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
   availCount: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs },

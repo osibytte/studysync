@@ -108,16 +108,6 @@ describe('checkProfileCompleteness', () => {
     expect(result.missing).toEqual([]);
   });
 
-  it('does not require topics', () => {
-    /**
-     * Load-bearing: a student with zero topics still matches on course plus
-     * schedule, which is the spec's own relaxed-filter fallback. Requiring
-     * topics would add onboarding friction for no functional gain.
-     */
-    const result = checkProfileCompleteness(complete);
-    expect(result.complete).toBe(true);
-  });
-
   it('flags each missing piece by name', () => {
     const result = checkProfileCompleteness({
       fullName: null,

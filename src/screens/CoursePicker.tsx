@@ -86,7 +86,7 @@ export function CoursePicker({
      * The real id comes from Postgres. Offline there is none, so a temp id
      * keyed on the course id keeps the list stable and still identifies the
      * row. Replaced on the next successful load. The temp- prefix is checked
-     * elsewhere (topics, availability) to skip rows that are not persisted yet.
+     * elsewhere (availability) to skip rows that are not persisted yet.
      */
     const base = userCourses;
     const optimistic: UserCourseWithDetail = {
@@ -98,7 +98,6 @@ export function CoursePicker({
       matching_pref: 'system',
       created_at: new Date().toISOString(),
       course,
-      topic_ids: [],
     };
     setLocal([...base, optimistic]);
 

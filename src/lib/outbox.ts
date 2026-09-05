@@ -24,9 +24,9 @@ import { supabase, isNetworkError } from './supabase';
  *   "save profile" on a bad connection creates duplicate rows.
  *
  *   Ordering. Strictly FIFO, and a failed action blocks the ones behind it.
- *   Later actions routinely depend on earlier ones (add a course, then tick
- *   its topics), so draining out of order would apply a topic selection to a
- *   user_course row that does not exist yet.
+ *   Later actions routinely depend on earlier ones (add a course, then set
+ *   its availability), so draining out of order would apply an availability
+ *   update to a user_course row that does not exist yet.
  *
  *   Failure classification. Network errors requeue and retry forever with
  *   backoff. Everything else (an RLS rejection, a constraint violation, bad
@@ -43,7 +43,6 @@ export type OutboxActionType =
   | 'profile.update'
   | 'course.add'
   | 'course.remove'
-  | 'topics.set'
   | 'availability.set';
 
 export interface OutboxAction {
@@ -224,29 +223,6 @@ async function applyAction(action: OutboxAction): Promise<void> {
         .eq('user_id', action.userId)
         .eq('course_id', course_id);
       if (error) throw error;
-      return;
-    }
-
-    case 'topics.set': {
-      const { user_course_id, topic_ids } = action.payload as {
-        user_course_id: string;
-        topic_ids: string[];
-      };
-      // Replace rather than diff: the payload is the student's full intended
-      // selection, and delete-then-insert is far easier to reason about than
-      // computing a delta against whatever the server currently holds.
-      const { error: delError } = await supabase
-        .from('user_course_topics')
-        .delete()
-        .eq('user_course_id', user_course_id);
-      if (delError) throw delError;
-
-      if (topic_ids.length > 0) {
-        const { error: insError } = await supabase
-          .from('user_course_topics')
-          .insert(topic_ids.map((topic_id) => ({ user_course_id, topic_id })));
-        if (insError) throw insError;
-      }
       return;
     }
 

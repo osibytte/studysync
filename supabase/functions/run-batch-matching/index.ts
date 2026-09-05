@@ -189,14 +189,12 @@ Deno.serve(async (req: Request) => {
         groups.push(toBatchGroup(g, name, byId));
       } else {
         const groupId = crypto.randomUUID();
-        const topicIds = majorityTopics(g.memberIds, byId);
         const { error } = await admin.rpc('create_system_group', {
           p_group_id: groupId,
           p_group_name: name,
           p_course_id: courseId,
           p_member_ids: g.memberIds,
           p_creator_id: g.seedId,
-          p_topic_ids: topicIds.length > 0 ? topicIds : null,
           p_max_members: GROUP_MAX_MEMBERS,
         });
         if (error) {
@@ -236,14 +234,13 @@ Deno.serve(async (req: Request) => {
 /** Per-pool-member data kept alongside the scoring profile for naming/output. */
 interface MemberInfo {
   name: string | null;
-  topicIds: string[];
 }
 
 /**
  * The matching pool for a course: everyone enrolled with matching_pref='system'
  * who is not already in a group on this course. Returns both the scoring inputs
- * (PartitionMember[]) and a lookup of name/topics per user id for the write phase
- * and the response.
+ * (PartitionMember[]) and a lookup of name per user id for the write phase and
+ * the response.
  */
 async function loadPool(
   admin: SupabaseClient,
@@ -251,7 +248,7 @@ async function loadPool(
 ): Promise<{ members: PartitionMember[]; byId: Map<string, MemberInfo> }> {
   const { data: enrolments, error } = await admin
     .from('user_courses')
-    .select('user_id, availability, user_course_topics ( topic_id ), users ( full_name )')
+    .select('user_id, availability, users ( full_name )')
     .eq('course_id', courseId)
     .eq('matching_pref', 'system')
     .limit(MAX_POOL);
@@ -263,11 +260,10 @@ async function loadPool(
   const members: PartitionMember[] = [];
   for (const r of (enrolments ?? []) as any[]) {
     if (grouped.has(r.user_id)) continue; // already in a group on this course
-    const topicIds = (r.user_course_topics ?? []).map((t: { topic_id: string }) => t.topic_id);
-    byId.set(r.user_id, { name: r.users?.full_name ?? null, topicIds });
+    byId.set(r.user_id, { name: r.users?.full_name ?? null });
     members.push({
       id: r.user_id,
-      profile: { topicIds, availability: decodeAvailability(r.availability) },
+      profile: { availability: decodeAvailability(r.availability) },
     });
   }
   return { members, byId };
@@ -284,25 +280,6 @@ async function loadGroupedUserIdsForCourse(
     .eq('groups.course_id', courseId);
   if (error) throw error;
   return new Set((data ?? []).map((r: any) => r.user_id));
-}
-
-/**
- * The topics a formed group should carry: those held by at least half its
- * members (majority rule, freeCount >= ceil(n/2)) — the same threshold
- * groupCommonAvailability uses for slots, so a group's advertised topics reflect
- * its shared interests rather than every member's stray pick.
- */
-function majorityTopics(memberIds: string[], byId: Map<string, MemberInfo>): string[] {
-  const needed = Math.ceil(memberIds.length / 2);
-  const counts = new Map<string, number>();
-  for (const id of memberIds) {
-    for (const t of byId.get(id)?.topicIds ?? []) {
-      counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-  }
-  const out: string[] = [];
-  for (const [topicId, c] of counts) if (c >= needed) out.push(topicId);
-  return out;
 }
 
 /** Shape one partitioned group into the wire contract. Seed leads memberIds. */

@@ -76,11 +76,9 @@ export interface ProfileCompleteness {
 }
 
 /**
- * Topics are intentionally NOT required.
- *
- * A student with no topics still matches on course plus schedule, which is the
- * spec's own relaxed-filter fallback. Blocking onboarding on topic selection
- * would add friction against the 5-minute target for no functional gain.
+ * Completeness gate for leaving onboarding: name, department, at least one
+ * course, and some availability. Matching is by course + availability, and both
+ * are required here so a new profile is actually matchable the moment it lands.
  */
 export function checkProfileCompleteness(input: {
   fullName: string | null;

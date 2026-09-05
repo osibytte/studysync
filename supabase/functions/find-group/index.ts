@@ -5,13 +5,13 @@
 //
 // WHY THIS RUNS SERVER-SIDE (not in the app):
 // RLS restricts public.users and public.user_courses to the owner — a student
-// cannot read anyone else's topics or availability. Matching needs exactly that
-// data across many students, so it must run with the service_role key, which
+// cannot read anyone else's availability. Matching needs exactly that data
+// across many students, so it must run with the service_role key, which
 // bypasses RLS. That key is an Edge Function secret and never ships in the app.
 // The function reads privileged data, scores it with the SAME logic the client
 // uses (the mirrored _shared/matching.ts), and returns ONLY privacy-safe fields
-// (name + department, a score, shared counts) — never another student's email,
-// raw availability mask, or topic-id list.
+// (name + department, a score, shared counts) — never another student's email
+// or raw availability mask.
 //
 // The function is READ-ONLY: it suggests. Acting on a suggestion (request_to_join,
 // or create_group + send_invitation) is the client's job, through the RPCs in
@@ -61,18 +61,14 @@ function json(body: unknown, status = 200): Response {
 /** The score breakdown reshaped into the wire contract's snake_case summary. */
 function toSummary(match: {
   score: number;
-  topicScore: number;
   scheduleScore: number;
   fillScore: number;
-  sharedTopics: number;
   sharedSlots: number;
 }) {
   return {
     score: match.score,
-    topic_score: match.topicScore,
     schedule_score: match.scheduleScore,
     fill_score: match.fillScore,
-    shared_topics: match.sharedTopics,
     shared_slots: match.sharedSlots,
   };
 }
@@ -147,7 +143,6 @@ Deno.serve(async (req: Request) => {
     return json({
       requester: {
         course_id: courseId,
-        topic_count: requester.profile.topicIds.length,
         slot_count: countTrue(requester.profile.availability),
       },
       groups,
@@ -169,7 +164,7 @@ interface RequesterData {
   profile: ScoringProfile;
 }
 
-/** The requester's own enrolment for this course: availability + topic ids. */
+/** The requester's own enrolment for this course: availability. */
 async function loadRequester(
   admin: SupabaseClient,
   uid: string,
@@ -177,7 +172,7 @@ async function loadRequester(
 ): Promise<RequesterData | null> {
   const { data, error } = await admin
     .from('user_courses')
-    .select('user_course_id, availability, user_course_topics ( topic_id )')
+    .select('user_course_id, availability')
     .eq('user_id', uid)
     .eq('course_id', courseId)
     .maybeSingle();
@@ -188,7 +183,6 @@ async function loadRequester(
   return {
     userCourseId: data.user_course_id,
     profile: {
-      topicIds: (data.user_course_topics ?? []).map((t: { topic_id: string }) => t.topic_id),
       availability: decodeAvailability(data.availability),
     },
   };
@@ -206,7 +200,7 @@ async function scoreExistingGroups(
 
   const { data: groupRows, error } = await admin
     .from('groups')
-    .select('group_id, group_name, course_id, status, max_members, group_topics ( topic_id )')
+    .select('group_id, group_name, course_id, status, max_members')
     .eq('course_id', courseId)
     .eq('is_discoverable', true)
     .in('status', JOINABLE_STATUSES)
@@ -246,7 +240,6 @@ async function scoreExistingGroups(
       status: g.status,
       availability_summary: describeSelection(commonGrid, 4),
       already_requested: requestedGroupIds.has(g.group_id),
-      topicIds: (g.group_topics ?? []).map((t: { topic_id: string }) => t.topic_id),
       availability: commonGrid,
       // A member row should always exist (the creator), but fall back to the
       // real count if the members read returned nothing for this group.
@@ -284,10 +277,10 @@ async function scoreLoneStudents(
   courseId: string,
   requester: ScoringProfile
 ) {
-  // Everyone enrolled in this course (with their topics + availability).
+  // Everyone enrolled in this course (with their availability + name).
   const { data: enrolments, error } = await admin
     .from('user_courses')
-    .select('user_id, availability, user_course_topics ( topic_id ), users ( full_name, department )')
+    .select('user_id, availability, users ( full_name, department )')
     .eq('course_id', courseId)
     .neq('user_id', uid)
     .limit(MAX_LONE_STUDENTS_SCANNED);
@@ -315,7 +308,6 @@ async function scoreLoneStudents(
         full_name: r.users?.full_name ?? null,
         department: r.users?.department ?? null,
         availability_summary: describeSelection(grid, 4),
-        topicIds: (r.user_course_topics ?? []).map((t: { topic_id: string }) => t.topic_id),
         availability: grid,
         // A hypothetical pairing: the other student is the sole existing member.
         memberCount: 1,

@@ -151,9 +151,8 @@ describe('toggling', () => {
 
 describe('overlap', () => {
   it('returns zero when there is no shared time', () => {
-    // The spec's named edge case: strong topic match, zero schedule overlap.
-    // Must be exactly 0 so the schedule term contributes nothing rather than
-    // a small positive number.
+    // The spec's named edge case: zero schedule overlap. Must be exactly 0 so
+    // the schedule term contributes nothing rather than a small positive number.
     const a = setDay(emptyGrid(), 0, true); // all Monday
     const b = setDay(emptyGrid(), 1, true); // all Tuesday
     expect(overlapCount(a, b)).toBe(0);

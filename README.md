@@ -2,7 +2,7 @@
 
 Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
 
-This is Stage 1 of a five-stage build. A student can register, sign in, set their name and department, pick courses, tick topics per course, and set a weekly availability grid. Everything works offline and syncs when the connection returns.
+This is Stage 1 of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. Everything works offline and syncs when the connection returns.
 
 Matching, groups, chat, materials and notifications are later stages. Home shows an honest "coming in Stage 2" placeholder rather than a button that does nothing.
 
@@ -32,11 +32,11 @@ Supabase dashboard → SQL Editor → New query. Run these three files in order,
 
 1. `supabase/migrations/0001_stage1_schema.sql` — tables, triggers, the overlap function
 2. `supabase/migrations/0002_stage1_rls.sql` — row level security policies
-3. `supabase/seed/0003_seed_courses_topics.sql` — placeholder courses and topics
+3. `supabase/seed/0003_seed_courses.sql` — placeholder courses
 
 Order matters: 0002 adds policies to tables 0001 creates, and 0003 inserts into them.
 
-**The seed data is placeholder.** The course codes follow the usual Nigerian convention and the topics are conventional for those subjects, but I have not seen the UI syllabus. Check every row against real course outlines before your pilot — topic overlap is weighted heaviest (0.5) in the compatibility score, so wrong topic lists produce confidently wrong matches.
+**The seed data is placeholder.** The course codes follow the usual Nigerian convention, but I have not seen the UI syllabus. Check every row against the real course catalogue before your pilot — matching only ever compares students enrolled in the same course, so a wrong or missing course code silently keeps compatible students apart.
 
 ### 4. Wire up your credentials
 
@@ -82,8 +82,7 @@ Time yourself against the 5-minute onboarding target:
 2. Enter name and department
 3. Pick two or three courses
 4. Set availability — tap a day name to fill the whole column
-5. Land on home, tap a course, tick some topics, save
-6. Confirm home reflects the topic count
+5. Land on home and confirm it reflects your courses and availability
 
 ### Offline behaviour
 
@@ -96,7 +95,7 @@ This is the heaviest requirement in the spec, so test it properly:
 5. Turn airplane mode off. The queue drains on its own and the banner disappears
 6. Check the Supabase table editor — the change landed
 
-Worth also trying: queue several changes, then reconnect. They apply in order, because a topic selection depends on its course enrolment existing first.
+Worth also trying: queue several changes, then reconnect. They apply in order, because setting a course's availability depends on its course enrolment existing first.
 
 ### RLS — the check that actually matters
 
@@ -134,17 +133,17 @@ If you see rows, RLS is not doing its job. Check that `0002_stage1_rls.sql` ran 
 
 The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). Run them in order after Stage 1's `0001`–`0003`.
 
-The compatibility score is the spec's weighted sum, normalised to `[0, 1]`:
+The compatibility score is a weighted sum, normalised to `[0, 1]`:
 
 ```
-score = 0.5 · topicOverlap + 0.3 · scheduleOverlap + 0.2 · groupFillBonus
+score = 0.8 · scheduleOverlap + 0.2 · groupFillBonus
 ```
 
-Topic fit is weighted heaviest (you're there to study the same thing), schedule next (you have to actually meet), with a small nudge toward filling a near-complete group. Both overlaps normalise against the *more constrained* side, not the maximum, so a focused or time-poor student is not punished for it. See `src/lib/matching.ts`.
+Matching is by **course + availability**: course is the grouping key (only students enrolled in the same course are ever compared), and schedule overlap is the real compatibility signal — you have to actually be able to meet — with a small nudge toward filling a near-complete group. Schedule overlap normalises against the *more constrained* side, not the maximum, so a time-poor student is not punished for it. See `src/lib/matching.ts`.
 
 ### Pathway One — the `find-group` matching function
 
-`supabase/functions/find-group` is an Edge Function that answers "find me a group for this course". It runs server-side for a privacy reason, not a performance one: RLS restricts `users` and `user_courses` to their owner, so the app *cannot* read other students' topics or availability. Matching needs exactly that, across many students, so it runs with the `service_role` key (an Edge Function secret, never shipped in the app), reads what it needs, scores it, and returns only privacy-safe fields — name and department, a score, and shared counts. Never an email, a raw availability mask, or a topic-id list.
+`supabase/functions/find-group` is an Edge Function that answers "find me a group for this course". It runs server-side for a privacy reason, not a performance one: RLS restricts `users` and `user_courses` to their owner, so the app *cannot* read other students' availability. Matching needs exactly that, across many students, so it runs with the `service_role` key (an Edge Function secret, never shipped in the app), reads what it needs, scores it, and returns only privacy-safe fields — name and department, a score, and a shared-slot count. Never an email or a raw availability mask.
 
 It is read-only. It *suggests* existing joinable groups (ranked) and lone students to form a new group with (ranked). Acting on a suggestion — `request_to_join`, or `create_group` + `send_invitation` — is the client's job through the `0005` RPCs.
 
@@ -216,7 +215,7 @@ app/                      expo-router routes
   _layout.tsx             providers + auth route guard
   (auth)/                 login, signup
   (onboarding)/           profile → courses → availability
-  (app)/                  home, profile, topics
+  (app)/                  home, profile
 src/
   components/             Button, TextField, Screen, AvailabilityGrid, OfflineBanner
   context/                AuthContext, NetworkContext
@@ -233,8 +232,8 @@ src/
     database.ts           schema types (Stage 1 + Stage 2 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS (0001–0007)
-  seed/                   placeholder courses and topics
+  migrations/             schema + RLS (0001–0009)
+  seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts
     find-group/           Pathway One matching Edge Function
@@ -243,7 +242,7 @@ supabase/
 
 ## Decisions worth knowing
 
-**Topics are a fixed curated list per course**, not free text. Matching compares topic id sets, so overlap is exact. Free text would silently under-report — "recursion" and "Recursive functions" scoring as zero overlap is the failure mode that makes a matching app feel broken.
+**Matching is by course and availability.** Course is the grouping key — only students enrolled in the same course are ever compared — and the weekly availability grid is the compatibility signal. There is no separate "topics" concept: the course *is* the subject.
 
 **Availability is a 7×4 grid stored as `bit(28)`.** Overlap is `bit_count(a & b)`, one cheap operation per candidate. Bit index is `day * 4 + slot`, bit 0 leftmost. The TypeScript in `src/lib/availability.ts` and the SQL `availability_overlap()` must agree on this — change one, change both.
 
@@ -257,8 +256,6 @@ supabase/
 
 Found during spec review; the feature logic requires them:
 
-- `topics` table — needed once topics became a curated list
-- `user_course_topics` join — normalised so matching counts overlap in SQL rather than intersecting arrays in JS
 - unique `(user_id, course_id)` on `user_courses`
 - `device_push_tokens` — Expo cannot deliver a push without a stored token per device
 - `applied_client_actions` — idempotency ledger for offline replay
@@ -267,8 +264,6 @@ Found during spec review; the feature logic requires them:
 Still to add in Stage 2: `invitations` and `join_requests` tables, and `groups.is_discoverable`, `last_activity_at`, `max_members`.
 
 ## Known gaps at this stage
-
-The `topics.set` write cannot run while its parent course enrolment is still queued offline — there is no `user_course_id` to attach topics to yet. The UI says so explicitly rather than dropping the selection. Narrow case: add a course offline, then try to set its topics before reconnecting.
 
 Availability edits apply to every enrolled course at once. Intentional for now, per above.
 

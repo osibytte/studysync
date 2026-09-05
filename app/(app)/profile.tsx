@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { AvailabilityGrid } from '@/components/AvailabilityGrid';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
@@ -165,26 +165,18 @@ export default function ProfileScreen() {
         <Text style={styles.emptyText}>No courses yet.</Text>
       ) : (
         userCourses.map((uc) => (
-          <Pressable
+          <View
             key={uc.user_course_id}
             style={styles.courseRow}
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/topics',
-                params: { userCourseId: uc.user_course_id, courseId: uc.course_id },
-              })
-            }
-            accessibilityRole="button"
-            accessibilityLabel={`${uc.course?.course_code}, change topics`}
+            accessibilityLabel={`${uc.course?.course_code}, ${uc.course?.course_title}`}
           >
             <View style={styles.courseTextCol}>
               <Text style={styles.courseCode}>{uc.course?.course_code}</Text>
-              <Text style={styles.courseMeta}>
-                {uc.topic_ids.length} topic{uc.topic_ids.length === 1 ? '' : 's'}
+              <Text style={styles.courseTitle} numberOfLines={1}>
+                {uc.course?.course_title}
               </Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          </View>
         ))
       )}
 
@@ -239,8 +231,7 @@ const styles = StyleSheet.create({
   },
   courseTextCol: { flex: 1 },
   courseCode: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
-  courseMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
-  chevron: { fontSize: fontSize.lg, color: colors.borderStrong, paddingHorizontal: spacing.sm },
+  courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: 2 },
   manageCourses: { marginTop: spacing.sm },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md },
   status: { color: colors.success, fontSize: fontSize.sm, marginTop: spacing.md },

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CacheKeys, cacheReadData, cacheWrite } from '@/lib/cache';
 import { supabase } from '@/lib/supabase';
-import type { Course, Topic } from '@/types/database';
+import type { Course } from '@/types/database';
 
 /**
- * Course and topic reference data.
+ * Course reference data.
  *
  * Cache-first with a background refresh: the list is seeded server-side and
  * changes at most once a semester, so serving it from cache is nearly always
@@ -65,58 +65,4 @@ export function useCourses(): CoursesState {
   }, [load]);
 
   return { courses, loading, error, fromCache, reload: load };
-}
-
-interface TopicsState {
-  topics: Topic[];
-  loading: boolean;
-  error: string | null;
-  reload: () => Promise<void>;
-}
-
-/** Topics for one course. Same cache-first pattern, keyed per course. */
-export function useTopics(courseId: string | null): TopicsState {
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!courseId) {
-      setTopics([]);
-      setLoading(false);
-      return;
-    }
-    setError(null);
-
-    const cached = await cacheReadData<Topic[]>(CacheKeys.topics(courseId));
-    if (cached && cached.length > 0) {
-      setTopics(cached);
-      setLoading(false);
-    }
-
-    const { data, error: fetchError } = await supabase
-      .from('topics')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('sort_order');
-
-    if (fetchError) {
-      if (!cached || cached.length === 0) {
-        setError("Can't load topics for this course.");
-      }
-      setLoading(false);
-      return;
-    }
-
-    const fresh = (data ?? []) as Topic[];
-    setTopics(fresh);
-    setLoading(false);
-    await cacheWrite(CacheKeys.topics(courseId), fresh);
-  }, [courseId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { topics, loading, error, reload: load };
 }
