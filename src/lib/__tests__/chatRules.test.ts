@@ -1,7 +1,12 @@
 import {
   FILE_NAME_MAX_LENGTH,
   MESSAGE_MAX_LENGTH,
+  PROPOSAL_DAYS_AHEAD,
+  PROPOSAL_FIRST_HOUR,
+  PROPOSAL_LAST_HOUR,
+  PROPOSAL_STEP_MIN,
   RUN_GAP_MS,
+  SESSION_DURATION_CHOICES,
   SESSION_DURATION_MAX,
   SESSION_DURATION_MIN,
   SESSION_LOCATION_MAX,
@@ -14,14 +19,18 @@ import {
   canDeleteMessage,
   canDownloadMaterial,
   canRespondToSession,
+  combineLocalDateTime,
   compareMessagesNewestFirst,
   dayLabel,
   deletedMessageText,
   fileExtension,
   fileKind,
+  firstOpenProposalSlot,
   formatClock,
   formatDuration,
   formatFileSize,
+  formatTimeOfDay,
+  isProposalSlotPast,
   isSessionPast,
   lastMessageLine,
   localDayKey,
@@ -29,6 +38,8 @@ import {
   materialStoragePath,
   nextPageCursor,
   normaliseMessageBody,
+  proposalDayOptions,
+  proposalTimeOptions,
   renderKind,
   safePathSegment,
   sessionRuleLabel,
@@ -315,6 +326,14 @@ describe('dayLabel', () => {
   it('names today and yesterday', () => {
     expect(dayLabel('2026-09-20', now)).toBe('Today');
     expect(dayLabel('2026-09-19', now)).toBe('Yesterday');
+  });
+
+  it('names tomorrow too, for the future-facing callers', () => {
+    // A transcript separator can never be dated ahead; sessionWhenLabel and the
+    // proposal picker both can, and "Tomorrow, 4pm" beats "21 September, 4pm".
+    expect(dayLabel('2026-09-21', now)).toBe('Tomorrow');
+    expect(dayLabel('2026-10-01', new Date(2026, 8, 30, 9, 0))).toBe('Tomorrow');
+    expect(dayLabel('2026-01-01', new Date(2025, 11, 31, 9, 0))).toBe('Tomorrow');
   });
 
   it('crosses a month boundary to find yesterday', () => {
@@ -958,6 +977,228 @@ describe('validateSessionProposal', () => {
     expect(at(null)).toBeNull();
     expect(at('')).toBeNull();
     expect(validateSessionProposal({ startsAt: future, durationMin: 60, now })).toBeNull();
+  });
+
+  it('bounds the note by a message body, since that is what it becomes', () => {
+    // propose_session writes the note as the timeline message's body, so the
+    // limit that catches it is messages_body_shape — not a limit of its own.
+    const at = (note: string | null) =>
+      validateSessionProposal({ startsAt: future, durationMin: 60, note, now });
+    expect(at('Library, ground floor')).toBeNull();
+    expect(at('x'.repeat(MESSAGE_MAX_LENGTH))).toBeNull();
+    expect(at(`  ${'x'.repeat(MESSAGE_MAX_LENGTH)}  `)).toBeNull();
+    expect(at('x'.repeat(MESSAGE_MAX_LENGTH + 1))).toBe(
+      `Keep the note under ${MESSAGE_MAX_LENGTH} characters`
+    );
+    // Blank is legal: the RPC substitutes "Proposed a study session".
+    expect(at('')).toBeNull();
+    expect(at('   ')).toBeNull();
+    expect(at(null)).toBeNull();
+  });
+});
+
+describe('formatTimeOfDay', () => {
+  it('words a time of day exactly as formatClock words an instant', () => {
+    // The picker chip and the message timestamp must not disagree about 4pm.
+    expect(formatTimeOfDay(16 * 60)).toBe('4pm');
+    expect(formatTimeOfDay(9 * 60 + 30)).toBe('9:30am');
+    expect(formatTimeOfDay(12 * 60)).toBe('12pm');
+    expect(formatTimeOfDay(0)).toBe('12am');
+    expect(formatTimeOfDay(16 * 60 + 5)).toBe(
+      formatClock(localIso(2026, 9, 5, 16, 5))
+    );
+  });
+
+  it('wraps rather than rendering a 25th hour', () => {
+    expect(formatTimeOfDay(1440)).toBe('12am');
+    expect(formatTimeOfDay(-30)).toBe('11:30pm');
+  });
+});
+
+describe('proposalDayOptions', () => {
+  const now = new Date(2026, 8, 20, 15, 0); // 20 September 2026, local
+
+  it('starts at today and runs two weeks out, labelled for a human', () => {
+    const options = proposalDayOptions(now);
+    expect(options).toHaveLength(PROPOSAL_DAYS_AHEAD);
+    expect(options[0]).toEqual({ dayKey: '2026-09-20', label: 'Today' });
+    expect(options[1]).toEqual({ dayKey: '2026-09-21', label: 'Tomorrow' });
+    expect(options[2]).toEqual({ dayKey: '2026-09-22', label: '22 September' });
+    expect(options[13].dayKey).toBe('2026-10-03');
+  });
+
+  it('steps by calendar date, not by 24 hours', () => {
+    // The reason this walks Y/M/D components: adding 86,400,000ms across a DST
+    // change repeats or skips a day, and a picker that offers Monday twice is
+    // worse than one that offers no Sunday.
+    const keys = proposalDayOptions(now, 14).map((o) => o.dayKey);
+    expect(new Set(keys).size).toBe(14);
+    for (let i = 1; i < keys.length; i += 1) {
+      expect(keys[i] > keys[i - 1]).toBe(true);
+    }
+  });
+
+  it('crosses a month and a year boundary without a gap', () => {
+    expect(proposalDayOptions(new Date(2026, 7, 30, 9, 0), 3).map((o) => o.dayKey)).toEqual([
+      '2026-08-30',
+      '2026-08-31',
+      '2026-09-01',
+    ]);
+    expect(proposalDayOptions(new Date(2026, 11, 31, 9, 0), 2).map((o) => o.dayKey)).toEqual([
+      '2026-12-31',
+      '2027-01-01',
+    ]);
+  });
+
+  it('always offers today, however few days are asked for', () => {
+    expect(proposalDayOptions(now, 0)).toHaveLength(1);
+    expect(proposalDayOptions(now, -5)[0].label).toBe('Today');
+  });
+});
+
+describe('proposalTimeOptions', () => {
+  it('covers the study day at half-hour steps, inclusive of both ends', () => {
+    const options = proposalTimeOptions();
+    expect(options[0]).toEqual({ minutes: PROPOSAL_FIRST_HOUR * 60, label: '6am' });
+    expect(options[options.length - 1]).toEqual({
+      minutes: PROPOSAL_LAST_HOUR * 60,
+      label: '10pm',
+    });
+    expect(options).toHaveLength(
+      ((PROPOSAL_LAST_HOUR - PROPOSAL_FIRST_HOUR) * 60) / PROPOSAL_STEP_MIN + 1
+    );
+  });
+
+  it('is strictly increasing, so the grid reads in order', () => {
+    const minutes = proposalTimeOptions().map((o) => o.minutes);
+    for (let i = 1; i < minutes.length; i += 1) {
+      expect(minutes[i] - minutes[i - 1]).toBe(PROPOSAL_STEP_MIN);
+    }
+  });
+});
+
+describe('SESSION_DURATION_CHOICES', () => {
+  it('offers nothing the RPC would refuse', () => {
+    for (const minutes of SESSION_DURATION_CHOICES) {
+      expect(minutes).toBeGreaterThanOrEqual(SESSION_DURATION_MIN);
+      expect(minutes).toBeLessThanOrEqual(SESSION_DURATION_MAX);
+      expect(formatDuration(minutes).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('combineLocalDateTime', () => {
+  it('reads the chips back as the local wall-clock time they named', () => {
+    // Compared against a locally built Date rather than a 'Z' string: the point
+    // of this function is that 4pm means 4pm where the student is standing.
+    expect(combineLocalDateTime('2026-09-21', 16 * 60)).toBe(
+      localIso(2026, 9, 21, 16, 0)
+    );
+    expect(combineLocalDateTime('2026-09-21', 9 * 60 + 30)).toBe(
+      localIso(2026, 9, 21, 9, 30)
+    );
+  });
+
+  it('round-trips through the labels the card will render', () => {
+    const now = new Date(2026, 8, 20, 15, 0);
+    const iso = combineLocalDateTime('2026-09-21', 16 * 60);
+    expect(localDayKey(iso)).toBe('2026-09-21');
+    expect(formatClock(iso)).toBe('4pm');
+    expect(sessionWhenLabel(iso, 120, now)).toBe('Tomorrow, 4pm – 6pm');
+  });
+
+  it('produces something validateSessionProposal accepts', () => {
+    const now = new Date(2026, 8, 20, 15, 0);
+    expect(
+      validateSessionProposal({
+        startsAt: combineLocalDateTime('2026-09-21', 16 * 60),
+        durationMin: 120,
+        now,
+      })
+    ).toBeNull();
+  });
+
+  it('returns empty for a malformed key instead of an Invalid Date', () => {
+    expect(combineLocalDateTime('', 600)).toBe('');
+    expect(combineLocalDateTime('rubbish', 600)).toBe('');
+    expect(combineLocalDateTime('2026-09', 600)).toBe('');
+  });
+
+  it('clamps a nonsense time of day rather than shifting the date', () => {
+    expect(combineLocalDateTime('2026-09-21', -60)).toBe(localIso(2026, 9, 21, 0, 0));
+  });
+});
+
+describe('isProposalSlotPast', () => {
+  const now = new Date(2026, 8, 20, 15, 0); // 20 September 2026, 3pm local
+
+  it('greys out what has been and gone today, and now itself', () => {
+    expect(isProposalSlotPast('2026-09-20', 9 * 60, now)).toBe(true);
+    expect(isProposalSlotPast('2026-09-20', 15 * 60, now)).toBe(true);
+    expect(isProposalSlotPast('2026-09-20', 15 * 60 + 30, now)).toBe(false);
+  });
+
+  it('leaves every later day alone', () => {
+    expect(isProposalSlotPast('2026-09-21', 6 * 60, now)).toBe(false);
+  });
+
+  it('agrees with validateSessionProposal about the same slot', () => {
+    // Two ways of saying the same thing, so the chip cannot be tappable while
+    // the form refuses it — or greyed out while the form would have taken it.
+    for (const [dayKey, minutes] of [
+      ['2026-09-20', 9 * 60],
+      ['2026-09-20', 15 * 60],
+      ['2026-09-20', 20 * 60],
+      ['2026-09-21', 6 * 60],
+    ] as const) {
+      const startsAt = combineLocalDateTime(dayKey, minutes);
+      const refused =
+        validateSessionProposal({ startsAt, durationMin: 60, now }) !== null;
+      expect(isProposalSlotPast(dayKey, minutes, now)).toBe(refused);
+    }
+  });
+
+  it('says nothing is past when the key cannot be read', () => {
+    expect(isProposalSlotPast('', 600, now)).toBe(false);
+  });
+});
+
+describe('firstOpenProposalSlot', () => {
+  it('opens on the next slot still to come today', () => {
+    const at = firstOpenProposalSlot(new Date(2026, 8, 20, 15, 0));
+    expect(at).toEqual({ dayKey: '2026-09-20', minutes: 15 * 60 + 30 });
+  });
+
+  it('opens on the first slot of the day when the day has not started', () => {
+    const at = firstOpenProposalSlot(new Date(2026, 8, 20, 4, 0));
+    expect(at).toEqual({ dayKey: '2026-09-20', minutes: PROPOSAL_FIRST_HOUR * 60 });
+  });
+
+  it('rolls onto tomorrow once today is spent', () => {
+    // 11pm: every chip on today is behind us, so opening on one would show a
+    // greyed slot with the form already refusing it.
+    const at = firstOpenProposalSlot(new Date(2026, 8, 20, 23, 0));
+    expect(at).toEqual({ dayKey: '2026-09-21', minutes: PROPOSAL_FIRST_HOUR * 60 });
+  });
+
+  it('always names a slot the grid itself offers, and one the form accepts', () => {
+    for (const now of [
+      new Date(2026, 8, 20, 5, 59),
+      new Date(2026, 8, 20, 15, 1),
+      new Date(2026, 8, 20, 21, 59),
+      new Date(2026, 11, 31, 23, 45), // and across a year boundary
+    ]) {
+      const at = firstOpenProposalSlot(now);
+      expect(proposalDayOptions(now).map((d) => d.dayKey)).toContain(at.dayKey);
+      expect(proposalTimeOptions().map((t) => t.minutes)).toContain(at.minutes);
+      expect(
+        validateSessionProposal({
+          startsAt: combineLocalDateTime(at.dayKey, at.minutes),
+          durationMin: 60,
+          now,
+        })
+      ).toBeNull();
+    }
   });
 });
 

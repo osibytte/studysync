@@ -201,19 +201,37 @@ export default function GroupDetailScreen() {
       title={group.group_name}
       footer={
         <View>
-          {showInvite && (
-            <Button
-              label="Invite someone"
-              onPress={() => router.push(`/(app)/groups/${group.group_id}/invite`)}
-              accessibilityHint="Search students on this course and invite one"
-            />
-          )}
+          {/*
+            Chat is the primary action, and the only one that works offline: it
+            is where the group actually happens — messages, and the study times
+            it proposes, answers and calls off. Inviting shares the second row
+            with Back so three stacked full-width buttons do not take a third of
+            the screen on the entry-level phones this app is for.
+          */}
           <Button
-            label="Back"
-            variant="ghost"
-            onPress={() => router.back()}
-            style={showInvite ? styles.footerSecond : undefined}
+            label="Open chat"
+            onPress={() => router.push(`/(app)/groups/${group.group_id}/chat`)}
+            accessibilityHint="Messages, and the study times this group has proposed"
           />
+          <View style={styles.footerRow}>
+            {showInvite && (
+              <Button
+                label="Invite someone"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => router.push(`/(app)/groups/${group.group_id}/invite`)}
+                accessibilityHint="Search students on this course and invite one"
+                style={styles.footerRowButton}
+              />
+            )}
+            <Button
+              label="Back"
+              variant="ghost"
+              fullWidth={false}
+              onPress={() => router.back()}
+              style={styles.footerRowButton}
+            />
+          </View>
         </View>
       }
     >
@@ -605,7 +623,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   spaced: { marginTop: spacing.sm },
-  footerSecond: { marginTop: spacing.sm },
+  footerRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  footerRowButton: { flex: 1 },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md, lineHeight: 20 },
   status: { color: colors.success, fontSize: fontSize.sm, marginTop: spacing.md },
 });

@@ -169,8 +169,12 @@ export function localDayKey(iso: string): string {
 }
 
 /**
- * A day separator's text: "Today", "Yesterday", "5 September", or with the year
- * once the day is outside the current one.
+ * A day separator's text: "Today", "Yesterday", "Tomorrow", "5 September", or
+ * with the year once the day is outside the current one.
+ *
+ * "Tomorrow" is for the future-facing callers — `sessionWhenLabel` and the
+ * proposal picker below. A transcript separator cannot reach it, since a message
+ * that has been sent is never dated ahead.
  *
  * `now` is injected rather than read from the clock so the boundary cases are
  * testable — and so a screen left open across midnight can rebuild against a
@@ -187,25 +191,38 @@ export function dayLabel(dayKey: string, now: Date = new Date()): string {
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (dayKey === localDayKey(yesterday.toISOString())) return 'Yesterday';
 
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (dayKey === localDayKey(tomorrow.toISOString())) return 'Tomorrow';
+
   const month = MONTHS[m - 1] ?? '';
   return y === now.getFullYear() ? `${d} ${month}` : `${d} ${month} ${y}`;
 }
 
 /**
- * "4:05pm", "8am", "12pm".
- *
  * Twelve-hour and lowercase to match the availability grid's own wording
  * ("8am – 12pm" in `SLOTS`), so the two screens do not disagree about what an
  * afternoon looks like. Minutes are dropped when they are zero.
+ *
+ * Shared by both public formatters below so a clock read off a message and one
+ * read off a picker chip cannot end up worded differently.
  */
+function clock12(hours24: number, minutes: number): string {
+  const suffix = hours24 < 12 ? 'am' : 'pm';
+  const h12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return minutes === 0 ? `${h12}${suffix}` : `${h12}:${two(minutes)}${suffix}`;
+}
+
+/** "4:05pm", "8am", "12pm" — an instant, in the device's timezone. */
 export function formatClock(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const h24 = d.getHours();
-  const suffix = h24 < 12 ? 'am' : 'pm';
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  const mins = d.getMinutes();
-  return mins === 0 ? `${h12}${suffix}` : `${h12}:${two(mins)}${suffix}`;
+  return clock12(d.getHours(), d.getMinutes());
+}
+
+/** The same wording from minutes since local midnight: "4pm", "9:30am". */
+export function formatTimeOfDay(minutes: number): string {
+  const total = ((Math.round(minutes) % 1440) + 1440) % 1440;
+  return clock12(Math.floor(total / 60), total % 60);
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +553,8 @@ export function canRespondToSession(
 
 /**
  * Validates a proposal against `propose_session`'s own checks: a start strictly
- * in the future, 15 to 480 minutes, an optional location under 200 characters.
+ * in the future, 15 to 480 minutes, an optional location under 200 characters,
+ * and an optional note within a message body's length — see the note below.
  *
  * The future check is the one worth catching locally. Offline it is the whole
  * problem: a session queued for 4pm today and drained at 5pm is refused by the
@@ -549,6 +567,7 @@ export function validateSessionProposal(input: {
   startsAt: string;
   durationMin: number;
   location?: string | null;
+  note?: string | null;
   now?: Date;
 }): string | null {
   const now = input.now ?? new Date();
@@ -565,7 +584,144 @@ export function validateSessionProposal(input: {
   if ((input.location ?? '').trim().length > SESSION_LOCATION_MAX) {
     return `Keep the location under ${SESSION_LOCATION_MAX} characters`;
   }
+  /**
+   * The note is not a field of its own server-side: `propose_session` writes it
+   * as the timeline message's BODY, falling back to "Proposed a study session"
+   * when it is blank. So an empty note is fine and an over-long one is refused by
+   * `messages_body_shape` — the same 2000 as any other message, which is why this
+   * bound is `MESSAGE_MAX_LENGTH` rather than a number of its own.
+   */
+  if ((input.note ?? '').trim().length > MESSAGE_MAX_LENGTH) {
+    return `Keep the note under ${MESSAGE_MAX_LENGTH} characters`;
+  }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Picking a time, with no date picker on hand
+// ---------------------------------------------------------------------------
+
+/**
+ * The proposal form offers chips rather than a native picker, and that is a
+ * dependency decision as much as a design one: `datetimepicker` is not installed,
+ * its two platforms disagree about how a picker even behaves, and the data-usage
+ * rule is not helped by adding one. Chips also give the 44pt targets the theme
+ * insists on and read identically everywhere — the same reason every label in
+ * this module is hand-rolled instead of left to `Intl`.
+ *
+ * All three lists are LOCAL. A student proposing "tomorrow at 4" means 4pm where
+ * they are standing, and `combineLocalDateTime` is the one place that becomes the
+ * UTC instant `propose_session` stores.
+ */
+export const PROPOSAL_DAYS_AHEAD = 14;
+
+export interface ProposalDayOption {
+  /** `YYYY-MM-DD` in the device's timezone — feeds combineLocalDateTime. */
+  dayKey: string;
+  label: string;
+}
+
+export function proposalDayOptions(
+  now: Date = new Date(),
+  days: number = PROPOSAL_DAYS_AHEAD
+): ProposalDayOption[] {
+  const options: ProposalDayOption[] = [];
+  for (let i = 0; i < Math.max(1, Math.floor(days)); i += 1) {
+    // Built from local Y/M/D components rather than by adding 86,400,000ms, so a
+    // day that is 23 or 25 hours long under a DST change still lands on the next
+    // calendar date instead of repeating or skipping one.
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    const dayKey = localDayKey(day.toISOString());
+    options.push({ dayKey, label: dayLabel(dayKey, now) });
+  }
+  return options;
+}
+
+export const PROPOSAL_FIRST_HOUR = 6;
+export const PROPOSAL_LAST_HOUR = 22;
+export const PROPOSAL_STEP_MIN = 30;
+
+export interface ProposalTimeOption {
+  /** Minutes since local midnight. */
+  minutes: number;
+  label: string;
+}
+
+export function proposalTimeOptions(): ProposalTimeOption[] {
+  const options: ProposalTimeOption[] = [];
+  const last = PROPOSAL_LAST_HOUR * 60;
+  for (let m = PROPOSAL_FIRST_HOUR * 60; m <= last; m += PROPOSAL_STEP_MIN) {
+    options.push({ minutes: m, label: formatTimeOfDay(m) });
+  }
+  return options;
+}
+
+/** The lengths the form offers. Every one is inside the RPC's 15–480. */
+export const SESSION_DURATION_CHOICES = [30, 60, 90, 120, 180] as const;
+
+/**
+ * A local day plus a local time of day, as the UTC instant the RPC takes.
+ *
+ * Through the Date constructor's local-components form, which is the only thing
+ * here that knows the device's offset — a DST jump included, where 2:30am may not
+ * exist at all and the platform resolves it. Returns '' for a malformed key, so
+ * the form says "Pick a date and time" instead of sending `Invalid Date`.
+ */
+export function combineLocalDateTime(
+  dayKey: string,
+  minutesOfDay: number
+): string {
+  const [y, m, d] = (dayKey || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const total = Math.max(0, Math.round(minutesOfDay));
+  const at = new Date(y, m - 1, d, Math.floor(total / 60), total % 60, 0, 0);
+  if (Number.isNaN(at.getTime())) return '';
+  return at.toISOString();
+}
+
+/**
+ * Whether a chip in the grid has already been and gone — today's early hours, in
+ * practice. Greying those out is kinder than taking the tap and then refusing it
+ * with `validateSessionProposal`'s message.
+ */
+export function isProposalSlotPast(
+  dayKey: string,
+  minutesOfDay: number,
+  now: Date = new Date()
+): boolean {
+  const iso = combineLocalDateTime(dayKey, minutesOfDay);
+  if (!iso) return false;
+  return new Date(iso).getTime() <= now.getTime();
+}
+
+export interface ProposalSlot {
+  dayKey: string;
+  minutes: number;
+}
+
+/**
+ * The selection the form should open on: the earliest slot in the grid that has
+ * not been and gone.
+ *
+ * Which is usually "today, at the next half hour", but at 11pm every one of
+ * today's chips is past — so this rolls onto tomorrow rather than opening on a
+ * greyed-out chip with `validateSessionProposal` already refusing it. Walking the
+ * same two generators the grid renders is what keeps the default a slot the grid
+ * actually offers.
+ */
+export function firstOpenProposalSlot(now: Date = new Date()): ProposalSlot {
+  const days = proposalDayOptions(now);
+  const times = proposalTimeOptions();
+  for (const day of days) {
+    for (const time of times) {
+      if (!isProposalSlotPast(day.dayKey, time.minutes, now)) {
+        return { dayKey: day.dayKey, minutes: time.minutes };
+      }
+    }
+  }
+  // Unreachable with a 14-day window, but a total function beats a non-null
+  // assertion at the call site.
+  return { dayKey: days[0]?.dayKey ?? '', minutes: times[0]?.minutes ?? 0 };
 }
 
 // ---------------------------------------------------------------------------

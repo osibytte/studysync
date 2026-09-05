@@ -21,6 +21,12 @@ interface Props {
   /** Pinned to the bottom, outside the scroll area — for primary actions. */
   footer?: React.ReactNode;
   contentStyle?: ViewStyle;
+  /**
+   * Overrides the footer's own padding and top border. For a footer that is
+   * edge-to-edge and draws its own frame — the chat composer and its propose
+   * sheet — where the default 16pt inset and a second border read as a mistake.
+   */
+  footerStyle?: ViewStyle;
 }
 
 /**
@@ -37,6 +43,7 @@ export function Screen({
   scroll = true,
   footer,
   contentStyle,
+  footerStyle,
 }: Props) {
   const body = (
     <>
@@ -75,7 +82,7 @@ export function Screen({
         ) : (
           <View style={[styles.flex, styles.content, contentStyle]}>{body}</View>
         )}
-        {!!footer && <View style={styles.footer}>{footer}</View>}
+        {!!footer && <View style={[styles.footer, footerStyle]}>{footer}</View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
