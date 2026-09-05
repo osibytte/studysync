@@ -16,9 +16,12 @@ import {
   notificationDedupeKey,
   parseClockMinutes,
   planReminders,
+  prunePastReminders,
   reminderContent,
   reminderFireTime,
   reminderId,
+  reviveReminders,
+  serializeReminders,
   shouldNotify,
   shouldScheduleReminder,
 } from '../notificationRules';
@@ -706,6 +709,92 @@ describe('diffReminders', () => {
   it('plans a session only once even if the row arrives twice', () => {
     const diff = diffReminders([plannedFor('s1', soon), plannedFor('s1', soon)], []);
     expect(diff.toSchedule).toHaveLength(1);
+  });
+});
+
+describe('prunePastReminders', () => {
+  const now = new Date(2026, 8, 6, 12, 0, 0);
+
+  it('keeps an alarm still comfortably ahead', () => {
+    const plan = [plannedFor('s1', new Date(2026, 8, 6, 15, 30, 0))];
+    expect(prunePastReminders(plan, now)).toEqual(plan);
+  });
+
+  it('drops an alarm whose time has passed', () => {
+    const plan = [plannedFor('s1', new Date(2026, 8, 6, 11, 59, 0))];
+    expect(prunePastReminders(plan, now)).toEqual([]);
+  });
+
+  it('drops one too close to place, on the same floor as shouldScheduleReminder', () => {
+    const justInside = new Date(now.getTime() + REMINDER_MIN_LEAD_MS);
+    const justOutside = new Date(now.getTime() + REMINDER_MIN_LEAD_MS - 1);
+    expect(prunePastReminders([plannedFor('s1', justInside)], now)).toHaveLength(1);
+    expect(prunePastReminders([plannedFor('s2', justOutside)], now)).toHaveLength(0);
+  });
+
+  it('keeps the survivors and their order when only some are stale', () => {
+    const plan = [
+      plannedFor('gone', new Date(2026, 8, 5, 9, 0, 0)),
+      plannedFor('soon', new Date(2026, 8, 6, 15, 30, 0)),
+      plannedFor('later', new Date(2026, 8, 7, 15, 30, 0)),
+    ];
+    expect(prunePastReminders(plan, now).map((r) => r.sessionId)).toEqual([
+      'soon',
+      'later',
+    ]);
+  });
+
+  it('leaves an empty plan empty', () => {
+    expect(prunePastReminders([], now)).toEqual([]);
+  });
+});
+
+describe('serializeReminders and reviveReminders', () => {
+  const fireAt = new Date(2026, 8, 6, 15, 30, 0);
+
+  it('survives the round trip through JSON, Date included', () => {
+    const plan = [plannedFor('s1', fireAt), plannedFor('s2', new Date(2026, 8, 7, 9, 0, 0))];
+    const revived = reviveReminders(JSON.parse(JSON.stringify(serializeReminders(plan))));
+    expect(revived).toEqual(plan);
+    expect(revived[0].fireAt).toBeInstanceOf(Date);
+  });
+
+  it('stores fireAt as a string, so nothing downstream can mistake it for a Date', () => {
+    const [stored] = serializeReminders([plannedFor('s1', fireAt)]);
+    expect(typeof stored.fireAt).toBe('string');
+    expect(new Date(stored.fireAt).getTime()).toBe(fireAt.getTime());
+  });
+
+  it('reads back nothing from a cache that holds the wrong shape', () => {
+    expect(reviveReminders(null)).toEqual([]);
+    expect(reviveReminders(undefined)).toEqual([]);
+    expect(reviveReminders('[]')).toEqual([]);
+    expect(reviveReminders({ id: 'x' })).toEqual([]);
+    expect(reviveReminders(7)).toEqual([]);
+  });
+
+  it('drops only the unreadable entry, never the whole plan', () => {
+    const good = serializeReminders([plannedFor('s1', fireAt)])[0];
+    const raw = [
+      good,
+      null,
+      'nonsense',
+      { ...good, id: 'someone-elses-notification' },
+      { ...good, sessionId: '' },
+      { ...good, fireAt: 'not a date' },
+      { ...good, fireAt: 42 },
+      { ...good, title: undefined },
+      { ...good, body: null },
+    ];
+    const revived = reviveReminders(raw);
+    expect(revived).toHaveLength(1);
+    expect(revived[0].sessionId).toBe('s1');
+  });
+
+  it('refuses an id that is not ours, so a foreign notification is never adopted', () => {
+    const stored = serializeReminders([plannedFor('s1', fireAt)])[0];
+    expect(reviveReminders([{ ...stored, id: `${REMINDER_ID_PREFIX}s1` }])).toHaveLength(1);
+    expect(reviveReminders([{ ...stored, id: 'studysync:something-else:s1' }])).toEqual([]);
   });
 });
 

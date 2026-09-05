@@ -31,6 +31,7 @@ import {
   setGroupDiscoverable,
 } from '@/lib/groups';
 import { enqueue } from '@/lib/outbox';
+import { refreshReminders } from '@/lib/reminders';
 import { friendlyError } from '@/lib/supabase';
 import { validateGroupName } from '@/lib/validation';
 import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
@@ -141,6 +142,9 @@ export default function GroupDetailScreen() {
       if (isOnline) {
         await leaveGroup(groupId);
         dropLocally();
+        // The group's study times are no longer this student's business, so the
+        // alarms they placed have to go with the membership.
+        void refreshReminders(userId);
       } else {
         await queueLeave();
       }

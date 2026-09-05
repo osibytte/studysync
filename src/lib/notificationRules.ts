@@ -585,6 +585,87 @@ export function planReminders(input: {
   return planned.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime());
 }
 
+/**
+ * Drop alarms whose moment has passed, so a plan may be reused later than it was
+ * built.
+ *
+ * `planReminders` filters against the `now` it was handed. A plan read back off
+ * the disk was built against an older `now` — possibly days older — and every
+ * entry that has since fired, or is now too close to bother, has to go. An
+ * overdue `fireAt` is not harmless: both platforms deliver a past-dated alarm
+ * more or less immediately, so restoring an unpruned plan announces "study time
+ * in 30 minutes" for a session that finished on Tuesday.
+ *
+ * Same `REMINDER_MIN_LEAD_MS` floor as `shouldScheduleReminder`, so a plan
+ * restored from cache and one freshly gathered agree about the borderline case
+ * instead of disagreeing on alternate app starts.
+ */
+export function prunePastReminders(
+  planned: readonly PlannedReminder[],
+  now: Date = new Date()
+): PlannedReminder[] {
+  return planned.filter(
+    (reminder) => reminder.fireAt.getTime() - now.getTime() >= REMINDER_MIN_LEAD_MS
+  );
+}
+
+/**
+ * A plan as it survives on disk.
+ *
+ * `fireAt` is an ISO string rather than a `Date` because the cache is JSON in
+ * AsyncStorage, and `JSON.parse` revives a serialised `Date` as a plain string.
+ * A `PlannedReminder[]` cast straight out of the cache would typecheck, ship, and
+ * then throw `fireAt.getTime is not a function` on somebody's phone — so the
+ * stored shape is honest about being text and `reviveReminders` is the only way
+ * back.
+ */
+export interface StoredReminder {
+  id: string;
+  sessionId: string;
+  fireAt: string;
+  title: string;
+  body: string;
+}
+
+export function serializeReminders(
+  planned: readonly PlannedReminder[]
+): StoredReminder[] {
+  return planned.map((reminder) => ({
+    id: reminder.id,
+    sessionId: reminder.sessionId,
+    fireAt: reminder.fireAt.toISOString(),
+    title: reminder.title,
+    body: reminder.body,
+  }));
+}
+
+/**
+ * Rebuild a plan from whatever the cache actually held, discarding the rest.
+ *
+ * Defensive rather than trusting, because the input came off a phone's disk,
+ * where a half-written entry, a blob written by an older shape of this file, or
+ * plain corruption are all ordinary things to find. One unreadable row costs that
+ * row's alarm and no more — throwing here would cost the student every alarm they
+ * had, at the one moment the app is trying to restore them.
+ */
+export function reviveReminders(raw: unknown): PlannedReminder[] {
+  if (!Array.isArray(raw)) return [];
+
+  const revived: PlannedReminder[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { id, sessionId, fireAt, title, body } = entry as Record<string, unknown>;
+    if (typeof id !== 'string' || !isReminderId(id)) continue;
+    if (typeof sessionId !== 'string' || sessionId.length === 0) continue;
+    if (typeof title !== 'string' || typeof body !== 'string') continue;
+    if (typeof fireAt !== 'string') continue;
+    const at = new Date(fireAt);
+    if (Number.isNaN(at.getTime())) continue;
+    revived.push({ id, sessionId, fireAt: at, title, body });
+  }
+  return revived;
+}
+
 /** One alarm the OS says it is already holding, as `notifier.ts` reads it back. */
 export interface ScheduledReminder {
   id: string;

@@ -50,6 +50,12 @@ export const CacheKeys = {
   // the end of that page while still belonging in this list.
   materials: (userId: string, groupId: string) =>
     `${PREFIX}:user:${userId}:materials:${groupId}`,
+
+  // Stage 5. The last COMPLETE set of alarms this student was owed, written only
+  // when every group answered. It is what lets the app restore alarms with no
+  // connection, and it is why a failed fetch can never be mistaken for "you have
+  // no study times" and quietly cancel them all. See src/lib/reminders.ts.
+  reminders: (userId: string) => `${PREFIX}:user:${userId}:reminders`,
 } as const;
 
 interface Envelope<T> {

@@ -49,6 +49,7 @@ import { pickMaterial } from '@/lib/filePicker';
 import { displayName, isCreator } from '@/lib/groupRules';
 import { makeActionId } from '@/lib/ids';
 import { enqueue, pendingActions } from '@/lib/outbox';
+import { askAboutReminders, refreshReminders } from '@/lib/reminders';
 import { friendlyError } from '@/lib/supabase';
 import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type {
@@ -375,12 +376,29 @@ export default function ChatScreen() {
       await refreshPending();
     };
 
+    /**
+     * The only place in the app that asks for notification permission, and only
+     * on "yes" — the one tap that means "I am going to this", which is when a
+     * student expects to be asked about being reminded. Awaited before the RPC so
+     * the system dialog is not competing with a card that has already changed,
+     * and deliberately not blocking: a refusal must still record the RSVP.
+     */
+    if (response === 'yes') {
+      try {
+        await askAboutReminders();
+      } catch {
+        /* No permission, no alarm. The RSVP is the point of this tap. */
+      }
+    }
+
     try {
       if (isOnline) {
         await respondToSession(session.session_id, response);
         // The trigger may have flipped the status as a result, so the card is
         // refetched rather than patched: the server owns every number on it.
         await refreshCards();
+        // And if it did flip, this phone is now owed an alarm it does not hold.
+        void refreshReminders(userId);
       } else {
         await queueIt();
       }
@@ -403,6 +421,9 @@ export default function ChatScreen() {
     try {
       await cancelSession(session.session_id);
       await refreshCards();
+      // The alarm has to go with it, or the group is called to a meeting that
+      // is off. Every other member's phone drops it on its next reconcile.
+      if (userId) void refreshReminders(userId);
       setStatus('Called off. The group sees it on the card.');
     } catch (err) {
       setActionError(friendlyError(err));

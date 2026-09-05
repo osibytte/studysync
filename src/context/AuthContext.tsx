@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { CacheKeys, cacheClearAll, cacheReadData, cacheWrite } from '@/lib/cache';
 import { outboxClearAll } from '@/lib/outbox';
+import { forgetReminders } from '@/lib/reminders';
 import { supabase } from '@/lib/supabase';
 import type { AppUser } from '@/types/database';
 
@@ -143,10 +144,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * profile, and worse, their queued writes would replay under the new
    * session. Phone-sharing is normal in this user population, so this is a
    * real scenario rather than a theoretical one.
+   *
+   * The pending study alarms go too, and they are the worst of the three to
+   * forget: they sit in the OS rather than in this app's storage, so clearing the
+   * cache does not touch them, and they would go on announcing a stranger's
+   * group and meeting time on the lock screen for weeks.
    */
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    await Promise.all([cacheClearAll(), outboxClearAll()]);
+    await Promise.all([cacheClearAll(), outboxClearAll(), forgetReminders()]);
     setProfile(null);
     setSession(null);
   }, []);
