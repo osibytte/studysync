@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -54,5 +54,92 @@ describe('availability mirror: src/lib/availability.ts <-> supabase/functions/_s
     const appCopy = read('src/lib/availability.ts').replace(/\r\n/g, '\n');
     const edgeCopy = read('supabase/functions/_shared/availability.ts').replace(/\r\n/g, '\n');
     expect(edgeCopy).toBe(appCopy);
+  });
+});
+
+/**
+ * Third mirror, same "change one, change both" rule, different pair.
+ *
+ * An RPC that begins with `claim_client_action(p_client_action_id, v_uid,
+ * '<action>')` owns its own idempotency ledger. For those, outbox.ts must NOT
+ * pre-insert the id — which is what `SELF_LEDGERED` is — because the RPC would
+ * then see its own action as an already-applied replay and do nothing at all.
+ *
+ * Both directions of that agreement fail silently, which is why they are pinned
+ * here rather than left to review:
+ *
+ *   - A name in SELF_LEDGERED that no RPC claims means nothing records the id,
+ *     so a retry after a lost response applies the write twice.
+ *   - A queued action whose RPC self-claims but which is missing from
+ *     SELF_LEDGERED is worse: the pre-insert burns the id the RPC is about to
+ *     look for, `claim_client_action` reports it used, and the RPC returns
+ *     early. The message is never sent, and nothing errors.
+ */
+const MIGRATIONS = join(ROOT, 'supabase', 'migrations');
+
+/** Every action name an RPC claims for itself, across all migrations. */
+function sqlClaimedActions(): Set<string> {
+  const names = new Set<string>();
+  for (const file of readdirSync(MIGRATIONS)) {
+    if (!file.endsWith('.sql')) continue;
+    const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
+    for (const match of sql.matchAll(
+      /claim_client_action\([^)]*?'([a-z]+\.[a-z]+)'\s*\)/g
+    )) {
+      names.add(match[1]);
+    }
+  }
+  return names;
+}
+
+function outboxSource(): string {
+  // Comments stripped: both regions below quote action names in prose, and a
+  // name mentioned in a comment is not a name in the array.
+  return read('src/lib/outbox.ts')
+    .replace(/\r\n/g, '\n')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+function actionNamesIn(region: string): string[] {
+  return [...region.matchAll(/'([a-z]+\.[a-z]+)'/g)].map((m) => m[1]);
+}
+
+describe('outbox ledger mirror: SELF_LEDGERED <-> claim_client_action in the migrations', () => {
+  const source = outboxSource();
+  const claimed = sqlClaimedActions();
+
+  const selfLedgered = (() => {
+    const start = source.indexOf('const SELF_LEDGERED');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = source.indexOf('];', start);
+    expect(end).toBeGreaterThan(start);
+    return actionNamesIn(source.slice(start, end));
+  })();
+
+  /** Every action applyAction knows how to replay. */
+  const replayed = [...source.matchAll(/case '([a-z]+\.[a-z]+)':/g)].map((m) => m[1]);
+
+  it('found both sides, so a rename cannot pass by emptying one of them', () => {
+    expect(claimed.size).toBeGreaterThanOrEqual(15);
+    expect(selfLedgered.length).toBeGreaterThanOrEqual(6);
+    expect(replayed.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it.each(selfLedgered)('%s is claimed by its own RPC in SQL', (action) => {
+    expect([...claimed]).toContain(action);
+  });
+
+  it('lists every replayable action whose RPC claims the ledger itself', () => {
+    const missing = replayed.filter(
+      (action) => claimed.has(action) && !selfLedgered.includes(action)
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('replays every action it declares as self-ledgered', () => {
+    // The reverse omission is harmless at runtime but means the list has grown a
+    // name nothing sends — usually the residue of a renamed action.
+    expect(selfLedgered.filter((action) => !replayed.includes(action))).toEqual([]);
   });
 });

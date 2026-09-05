@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { proposeSession, respondToSession, sendMessage } from './chat';
 import { createGroup, leaveGroup, setMatchingPref } from './groups';
 import { makeActionId } from './ids';
 import { supabase, isNetworkError } from './supabase';
-import type { MatchingPref } from '@/types/database';
+import type { MatchingPref, SessionResponseValue } from '@/types/database';
 
 /**
  * Offline write queue.
@@ -55,6 +56,36 @@ const DEAD_KEY = 'studysync:outbox:dead:v1';
  * and nobody else has to answer it. It is a private, last-write-wins setting
  * that only takes effect the next time an admin runs batch matching, so landing
  * it minutes later is honoured exactly as if it had landed at once.
+ *
+ * Stage 3 adds three more, and the test is the same one: does landing late
+ * change what the action means?
+ *
+ *   `chat.send` — no. A message is a statement, not a claim on anything, and it
+ *   carries its own device-generated `message_id`, so the bubble on screen and
+ *   the row that eventually lands are one object. This is the action the offline
+ *   requirement is really about: a student on hostel wifi types a message and it
+ *   sends when it can.
+ *
+ *   `session.propose` — no, with one honest failure. The proposal is a question
+ *   put to the group, and asking it late is still asking it. But `propose_session`
+ *   refuses a start time in the past, so a time that expires while the queue sits
+ *   dead-letters. `validateSessionProposal` is what keeps that rare: it refuses a
+ *   past time at the picker, so the only way to hit it is a queue that sat longer
+ *   than the gap the student left.
+ *
+ *   `session.respond` — no. An RSVP is last-write-wins on one
+ *   `(session_id, user_id)` row and hands out nothing finite; the server refuses
+ *   one that arrives after the session started rather than recording it late.
+ *   (0016's own header calls this online-only. HANDOFF §8 revisits it and this
+ *   is the settled answer.)
+ *
+ * Still deliberately online-only: `session.cancel`, because it is the one action
+ * other people act on — "the meeting is off" landing an hour late, after
+ * everybody has travelled, is worse than a cancel that refused to queue. Both
+ * material actions, because an upload needs bytes on the wire and a delete needs
+ * the bucket to answer. And `mark_group_read`, which is never queued at all: a
+ * read cursor replayed on reconnect would mark as read everything that arrived
+ * while the phone was face-down.
  */
 export type OutboxActionType =
   | 'profile.update'
@@ -63,7 +94,10 @@ export type OutboxActionType =
   | 'availability.set'
   | 'group.create'
   | 'group.leave'
-  | 'matching.pref';
+  | 'matching.pref'
+  | 'chat.send'
+  | 'session.propose'
+  | 'session.respond';
 
 export interface OutboxAction {
   /** uuid — doubles as the server-side idempotency key. */
@@ -189,6 +223,14 @@ const SELF_LEDGERED: readonly OutboxActionType[] = [
   'group.create',
   'group.leave',
   'matching.pref',
+  // The Stage 3 RPCs claim it the same way, under the action names above:
+  // send_message claims 'chat.send', propose_session 'session.propose',
+  // respond_to_session 'session.respond' (0014, 0016). Leaving any of them out
+  // of this list would have the pre-insert below burn the id the RPC is about
+  // to look for, and the message would silently never be sent.
+  'chat.send',
+  'session.propose',
+  'session.respond',
 ];
 
 /**
@@ -314,6 +356,75 @@ async function applyAction(action: OutboxAction): Promise<void> {
         pref: MatchingPref;
       };
       await setMatchingPref(course_id, pref, action.id);
+      return;
+    }
+
+    /**
+     * The message_id was generated when the student hit send, so the bubble that
+     * has been on screen since then and the row Postgres finally writes are the
+     * same object — the arriving Realtime echo collapses onto it by id and there
+     * is nothing to reconcile.
+     */
+    case 'chat.send': {
+      const { group_id, message_id, body } = action.payload as {
+        group_id: string;
+        message_id: string;
+        body: string;
+      };
+      await sendMessage({
+        groupId: group_id,
+        messageId: message_id,
+        body,
+        // The queued id, not a fresh one: that is what makes the replay a no-op.
+        clientActionId: action.id,
+      });
+      return;
+    }
+
+    /**
+     * Three rows server-side (session, its timeline message, the proposer's own
+     * yes) from one call, so both ids are generated on the device for the same
+     * reason as above.
+     *
+     * This is the one queued action that can legitimately dead-letter: the RPC
+     * refuses a start time that is now in the past. Nothing to retry there — the
+     * time the student picked has been and gone — so the dead-letter list is the
+     * honest place for it.
+     */
+    case 'session.propose': {
+      const { group_id, session_id, message_id, starts_at, duration_min, location, note } =
+        action.payload as {
+          group_id: string;
+          session_id: string;
+          message_id: string;
+          starts_at: string;
+          duration_min: number;
+          location?: string | null;
+          note?: string | null;
+        };
+      await proposeSession({
+        groupId: group_id,
+        sessionId: session_id,
+        messageId: message_id,
+        startsAt: starts_at,
+        durationMin: duration_min,
+        location: location ?? null,
+        note: note ?? null,
+        clientActionId: action.id,
+      });
+      return;
+    }
+
+    /**
+     * Last-write-wins on one row, like matching.pref: two queued answers for the
+     * same session apply in order and the later one stands.
+     */
+    case 'session.respond': {
+      const { session_id, response } = action.payload as {
+        session_id: string;
+        response: SessionResponseValue;
+      };
+      await respondToSession(session_id, response, action.id);
       return;
     }
 
