@@ -35,6 +35,13 @@ export const CacheKeys = {
   /** Discoverable groups on one course — a browse result, not owned content. */
   discover: (userId: string, courseId: string) =>
     `${PREFIX}:user:${userId}:discover:${courseId}`,
+
+  // Stage 3. The newest page of a group's timeline plus the session and file
+  // cards its rows point at, so the chat opens with the last conversation on
+  // screen and no connection. Per-user for the same reason groupDetail is: what
+  // a student may read of a group depends on their membership.
+  chat: (userId: string, groupId: string) =>
+    `${PREFIX}:user:${userId}:chat:${groupId}`,
 } as const;
 
 interface Envelope<T> {
