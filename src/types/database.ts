@@ -259,3 +259,207 @@ export interface MyGroupRow extends Group {
   member_count: number;
   course: Course | null;
 }
+
+// ===========================================================================
+// Stage 3 — the group timeline. Mirrors migrations 0013–0018.
+//
+// One table, `messages`, carries three kinds of thing: what somebody typed, a
+// study time somebody proposed, and a file somebody shared. Sessions and
+// materials live in their own tables and the message row points at them, so the
+// chat screen can page one ordered list and render three cards from it.
+//
+// Every write here goes through a SECURITY DEFINER RPC; `authenticated` holds
+// SELECT and nothing else on all three tables (0015, 0016, 0017). There are
+// deliberately no Insert/Update variants below.
+// ===========================================================================
+
+/**
+ * Which card a message renders as. The `messages_kind_shape` CHECK (added with the
+ * kind/session_id columns in 0016, widened for materials in 0017) ties each kind to
+ * exactly one referent: 'text' carries neither, 'session' carries session_id, 'file'
+ * carries material_id.
+ */
+export type MessageKind = 'text' | 'session' | 'file';
+
+export interface Message {
+  /** Generated on the device, so an optimistic bubble and its row are one thing. */
+  message_id: string;
+  group_id: string;
+  sender_id: string;
+  /** Empty string exactly when deleted_at is set — deleting really deletes text. */
+  body: string;
+  kind: MessageKind;
+  session_id: string | null;
+  material_id: string | null;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+/**
+ * Return row of `my_unread_counts()` (0014) — every badge in the app in one
+ * round trip, for the caller's own memberships only.
+ *
+ * `last_*` describe the newest message that has not been deleted, so deleting
+ * the last thing you said reveals the one before it instead of blanking the row.
+ * Null when the group has no messages yet. Own messages never count as unread.
+ */
+export interface UnreadCountRow {
+  group_id: string;
+  unread_count: number;
+  last_message_at: string | null;
+  last_sender_id: string | null;
+  last_body: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Study times (0016). Proposed from the chat, agreed by the group, and managed
+// there too — there is no separate sessions screen.
+// ---------------------------------------------------------------------------
+
+/**
+ * 'proposed' -> 'confirmed' happens by itself: the handle_session_response
+ * trigger flips it the moment enough members have said yes. 'cancelled' is
+ * terminal and only the proposer or the group's creator can set it.
+ */
+export type SessionStatus = 'proposed' | 'confirmed' | 'cancelled';
+
+export type SessionResponseValue = 'yes' | 'no' | 'maybe';
+
+export interface StudySession {
+  /** Client-generated, like message_id and for the same reason. */
+  session_id: string;
+  group_id: string;
+  proposed_by: string;
+  starts_at: string;
+  /** 15 to 480 minutes. A length, not an ends_at, so it cannot precede the start. */
+  duration_min: number;
+  /** Free text: a room, someone's flat, a meeting link. Null if unspecified. */
+  location: string | null;
+  status: SessionStatus;
+  created_at: string;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+}
+
+/**
+ * One member's answer. Composite primary key (session_id, user_id), so changing
+ * your mind updates in place rather than appending. Deny-all RLS: read these
+ * through `group_sessions` or `session_attendees`, never directly.
+ */
+export interface SessionResponse {
+  session_id: string;
+  user_id: string;
+  response: SessionResponseValue;
+  responded_at: string;
+}
+
+/**
+ * Return row of `group_sessions(p_group_id, p_include_past)` (0016) — one card
+ * per proposal, with the tally already computed.
+ *
+ * `confirm_threshold` and `members_counted` come back so the card can name the
+ * rule in force ("3 of 3 needed", "3 of 5 needed") rather than assuming one; the
+ * threshold is everybody below four members and a majority at four or more, the
+ * same shape as group_common_availability's meet_threshold. `my_response` is the
+ * caller's own answer, null if they have not said anything yet. `message_id` is
+ * the timeline card this session belongs to.
+ *
+ * Past sessions are excluded by default, where "past" means it started more than
+ * an hour ago — a session in progress is still the thing you want on screen.
+ */
+export interface GroupSessionRow {
+  session_id: string;
+  message_id: string | null;
+  starts_at: string;
+  duration_min: number;
+  location: string | null;
+  status: SessionStatus;
+  proposed_by: string;
+  proposer_name: string | null;
+  members_counted: number;
+  yes_count: number;
+  no_count: number;
+  maybe_count: number;
+  confirm_threshold: number;
+  my_response: SessionResponseValue | null;
+}
+
+/**
+ * Return row of `session_attendees(p_session_id)` (0016) — the whole roster, not
+ * just the people who answered: a member who has said nothing appears with
+ * `response` null, which is what makes "waiting on Ada" renderable. The proposer
+ * sorts first, then by name.
+ */
+export interface SessionAttendeeRow {
+  user_id: string;
+  full_name: string | null;
+  department: string | null;
+  is_proposer: boolean;
+  response: SessionResponseValue | null;
+  responded_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Shared files (0017, with the Storage read-back fix in 0018).
+//
+// The bytes live in the private `group-materials` Storage bucket, never in
+// Postgres. The path is always `<group_id>/<material_id>/<file_name>` and that
+// path is the permission: the Storage INSERT policy reads the first folder to
+// decide whether you may write there, and attach_material refuses any path that
+// does not start with the group and material it claims to be.
+// ---------------------------------------------------------------------------
+
+/** The bucket every group's files live in. Private; download via a signed URL. */
+export const MATERIALS_BUCKET = 'group-materials';
+
+/** 25 MB, matching the bucket's file_size_limit and the size_bytes CHECK. */
+export const MATERIALS_MAX_BYTES = 26_214_400;
+
+export interface Material {
+  /** Client-generated: it is half of the storage path, so it exists before upload. */
+  material_id: string;
+  group_id: string;
+  uploaded_by: string;
+  storage_path: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+  /**
+   * Soft delete. Setting this revokes the download for everybody at once,
+   * including whoever uploaded it, because the Storage read policy asks this
+   * table. The bytes must therefore be removed through the Storage API BEFORE
+   * delete_material is called — after it, nobody can reach them to clean up.
+   */
+  deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+/**
+ * Return row of `group_materials(p_group_id, p_include_deleted)` (0017) — the
+ * files tab, newest first.
+ *
+ * Removed files are included by default and marked, rather than hidden, so the
+ * tab explains a gap instead of leaving one; pass false for the live-only list.
+ * `storage_path` is here because the client needs it to ask for a signed URL, and
+ * `uploader_name` because RLS on public.users is own-row only — the same reason
+ * every other Stage 2 read RPC resolves names server-side.
+ */
+export interface GroupMaterialRow {
+  material_id: string;
+  message_id: string | null;
+  storage_path: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  uploader_name: string | null;
+  created_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+
+
+
+

@@ -1,0 +1,63 @@
+-- ============================================================================
+-- 0015_chat_write_privileges.sql
+--
+-- Make the privilege layer agree with the design.
+--
+-- 0013 granted `select` on public.messages to authenticated and said, in a
+-- comment, that students get SELECT "and nothing else". That turned out to be
+-- false the moment it ran. Measured immediately after the push:
+--
+--   authenticated -> DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+--
+-- The extra privileges come from 0008, which ended with
+--
+--   alter default privileges in schema public
+--     grant select, insert, update, delete on tables to authenticated, service_role;
+--
+-- so every table created in public from then on is born with full DML for
+-- authenticated, whatever its own migration grants. That was the right fix for
+-- 0008's problem (Stage 1–2 tables had no grants at all and the app was dead),
+-- but it means an explicit `grant select` in a later migration reads like a
+-- restriction while actually being a no-op.
+--
+-- Nothing was exploitable: RLS is enabled on messages and the only policy is
+-- FOR SELECT, and PostgreSQL denies any command a table has no permissive
+-- policy for. The gate held. But it was the only gate, and "students cannot
+-- write to this table" should not depend on a policy continuing not to exist —
+-- if anyone ever adds an INSERT policy for some unrelated reason, the privilege
+-- layer is what should still refuse. Revoking makes that failure closed.
+--
+-- The SECURITY DEFINER RPCs are unaffected: they execute as their owner, not as
+-- the caller, which is the whole reason they are the write path.
+--
+-- Deliberately NOT done here: the same tightening for the Stage 1 and 2 tables.
+-- They carry the broad grants explicitly from 0008 rather than by inheritance,
+-- RLS has guarded them in production since, and churning eight tables' ACLs to
+-- restate a rule they already enforce buys nothing. New tables get it right on
+-- the way in instead — see the note at the bottom for Stage 4 and 5.
+-- ============================================================================
+
+revoke insert, update, delete, truncate on public.messages from authenticated;
+
+-- anon never had SELECT here (its default is REFERENCES/TRIGGER/TRUNCATE only),
+-- but say so explicitly so a future default-privileges change cannot hand it
+-- one quietly.
+revoke all on public.messages from anon;
+
+-- ---------------------------------------------------------------------------
+-- FOR STAGE 4 AND 5: this is now a two-line ritual for every new table.
+--
+--   grant select on public.<table> to authenticated;          -- what you want
+--   revoke insert, update, delete, truncate on public.<table>
+--     from authenticated;                                     -- what 0008 gave
+--
+-- The first line alone does not do what it looks like it does. Check the result
+-- with:
+--
+--   select grantee, privilege_type from information_schema.role_table_grants
+--   where table_schema = 'public' and table_name = '<table>';
+--
+-- and filter on table_schema — Supabase ships a realtime.messages table too, so
+-- an unfiltered query by table name mixes two tables' ACLs together and reports
+-- privileges for anon that belong to the other one.
+-- ---------------------------------------------------------------------------
