@@ -15,10 +15,12 @@
       "package": "com.studysync.app",
       "adaptiveIcon": {
         "backgroundColor": "#12263A"
-      }
+      },
+      "permissions": ["SCHEDULE_EXACT_ALARM"]
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
