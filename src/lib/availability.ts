@@ -176,9 +176,8 @@ export function scheduleOverlapScore(a: AvailabilityGrid, b: AvailabilityGrid): 
 }
 
 /**
- * A group's representative availability grid — the slots the group can
- * *commonly* meet, used as the `Candidate.availability` the scorer overlaps a
- * requester against.
+ * A group's schedule *profile* — the grid the matching scorer overlaps a
+ * prospective member against, as `Candidate.availability`.
  *
  * A slot counts as "the group is free then" when at least half the members are
  * free then (majority rule, `freeCount >= ceil(n/2)`). Two deliberate choices:
@@ -190,17 +189,19 @@ export function scheduleOverlapScore(a: AvailabilityGrid, b: AvailabilityGrid): 
  *   * A one-member group reduces to exactly that member's own grid (ceil(1/2)=1),
  *     which is what a lone-student "form a new group" candidate should score as.
  *
- * NOT the same rule as the group detail screen's "when you can all meet", which
- * since migration 0012 requires EVERY member while the group is under four. That
- * heading answers "when do we meet" and has an exact answer for two people; this
- * function answers "how well would a newcomer fit here", and an intersection
- * would score most young groups 0 on schedule overlap — burying the groups that
- * most need members. The divergence is deliberate; change this one only for a
- * scoring reason, and change `group_common_availability` (0012) for a display one.
+ * This is NOT the group detail screen's "when you can all meet". That comes from
+ * the SQL `group_common_availability`, which since migration 0012 requires EVERY
+ * member while the group is under four. Different question, so different rule:
+ * the heading tells members when to turn up, and for two people that has an
+ * exact answer; this function asks how well a newcomer would fit, where an
+ * intersection would score most young groups 0 on schedule overlap and bury the
+ * ones that most need members. Both were called `groupCommonAvailability` until
+ * 2026-09-05, which is the confusion this name exists to prevent — change this
+ * one only for a scoring reason, and the SQL only for a display one.
  *
  * Returns an empty grid for no members, keeping the scorer's divisor non-zero.
  */
-export function groupCommonAvailability(grids: AvailabilityGrid[]): AvailabilityGrid {
+export function groupScheduleProfile(grids: AvailabilityGrid[]): AvailabilityGrid {
   const out = emptyGrid();
   const n = grids.length;
   if (n === 0) return out;

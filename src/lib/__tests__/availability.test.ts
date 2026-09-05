@@ -9,7 +9,7 @@ import {
   describeSelection,
   emptyGrid,
   encodeAvailability,
-  groupCommonAvailability,
+  groupScheduleProfile,
   isSlotSelected,
   isValidMask,
   overlapCount,
@@ -252,11 +252,11 @@ describe('scheduleOverlapScore', () => {
   });
 });
 
-describe('groupCommonAvailability', () => {
+describe('groupScheduleProfile', () => {
   it('returns an empty grid for no members', () => {
     // Keeps the scorer's divisor non-zero and means "a group with nobody in it
     // shares no time" rather than throwing.
-    expect(groupCommonAvailability([])).toEqual(emptyGrid());
+    expect(groupScheduleProfile([])).toEqual(emptyGrid());
   });
 
   it('reduces a one-member group to that member exactly (ceil(1/2)=1)', () => {
@@ -264,7 +264,23 @@ describe('groupCommonAvailability', () => {
     let g = emptyGrid();
     g = toggleSlot(g, 0, 0);
     g = toggleSlot(g, 3, 2);
-    expect(groupCommonAvailability([g])).toEqual(g);
+    expect(groupScheduleProfile([g])).toEqual(g);
+  });
+
+  it('is a union for two members, unlike the SQL display rule', () => {
+    // Deliberate divergence, and the whole reason this function is no longer
+    // called groupCommonAvailability. `group_common_availability` (0012) requires
+    // BOTH members here, because it answers "when do we turn up". This one asks
+    // "how well would a newcomer fit", and intersecting would score most
+    // two-member groups 0 on schedule overlap — burying the groups that most need
+    // members. If this test starts failing, the scorer's rule was changed to
+    // match the display rule; that is a regression, not a fix.
+    const a = toggleSlot(emptyGrid(), 0, 0); // Mon morning only
+    const b = toggleSlot(emptyGrid(), 4, 2); // Fri evening only
+    const profile = groupScheduleProfile([a, b]);
+    expect(isSlotSelected(profile, 0, 0)).toBe(true);
+    expect(isSlotSelected(profile, 4, 2)).toBe(true);
+    expect(countSelected(profile)).toBe(2);
   });
 
   it('includes a slot when a majority of members are free (odd size)', () => {
@@ -273,7 +289,7 @@ describe('groupCommonAvailability', () => {
     const a = toggleSlot(emptyGrid(), 0, 0); // Mon morning
     const b = toggleSlot(emptyGrid(), 0, 0); // Mon morning
     const c = toggleSlot(emptyGrid(), 1, 0); // Tue morning
-    const common = groupCommonAvailability([a, b, c]);
+    const common = groupScheduleProfile([a, b, c]);
     expect(isSlotSelected(common, 0, 0)).toBe(true);
     expect(isSlotSelected(common, 1, 0)).toBe(false);
     expect(countSelected(common)).toBe(1);
@@ -286,7 +302,7 @@ describe('groupCommonAvailability', () => {
     const also = toggleSlot(emptyGrid(), 2, 1);
     const other1 = toggleSlot(emptyGrid(), 5, 3);
     const other2 = emptyGrid();
-    const common = groupCommonAvailability([half, also, other1, other2]);
+    const common = groupScheduleProfile([half, also, other1, other2]);
     expect(isSlotSelected(common, 2, 1)).toBe(true); // 2 of 4
     expect(isSlotSelected(common, 5, 3)).toBe(false); // 1 of 4
   });
@@ -297,7 +313,7 @@ describe('groupCommonAvailability', () => {
     const a = setDay(emptyGrid(), 0, true); // all Monday
     const b = setDay(emptyGrid(), 0, true);
     const c = setDay(emptyGrid(), 6, true); // all Sunday — minority of 1
-    const common = groupCommonAvailability([a, b, c]);
+    const common = groupScheduleProfile([a, b, c]);
     // Monday survives (2 of 3), Sunday does not (1 of 3).
     expect(isSlotSelected(common, 0, 0)).toBe(true);
     expect(isSlotSelected(common, 6, 0)).toBe(false);

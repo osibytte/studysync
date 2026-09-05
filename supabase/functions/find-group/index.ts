@@ -25,7 +25,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import {
   decodeAvailability,
   describeSelection,
-  groupCommonAvailability,
+  groupScheduleProfile,
   type AvailabilityGrid,
 } from '../_shared/availability.ts';
 import {
@@ -232,7 +232,7 @@ async function scoreExistingGroups(
 
   const shaped: GroupCandidate[] = eligible.map((g: any) => {
     const members = membersByGroup.get(g.group_id) ?? { count: 0, grids: [] };
-    const commonGrid = groupCommonAvailability(members.grids);
+    const commonGrid = groupScheduleProfile(members.grids);
     return {
       group_id: g.group_id,
       group_name: g.group_name,
