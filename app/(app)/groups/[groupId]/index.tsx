@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { StatusPill } from '@/components/StatusPill';
@@ -33,7 +33,7 @@ import {
 import { enqueue } from '@/lib/outbox';
 import { friendlyError } from '@/lib/supabase';
 import { validateGroupName } from '@/lib/validation';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * One group: who is in it, when it can meet, who wants in, and what you can do
@@ -353,6 +353,25 @@ export default function GroupDetailScreen() {
         ))
       )}
 
+      {/*
+        The files the group has shared. A link rather than a list: rendering it
+        here would mean a second RPC on the screen every group is opened from,
+        and the tab it leads to is the thing that can afford one.
+      */}
+      <Text style={styles.sectionHeader}>Shared files</Text>
+      <Pressable
+        onPress={() => router.push(`/(app)/groups/${group.group_id}/files`)}
+        style={styles.linkRow}
+        accessibilityRole="button"
+        accessibilityLabel="Shared files"
+        accessibilityHint="Notes, slides and past papers shared in this group"
+      >
+        <Text style={styles.linkRowText}>
+          Notes, slides and past papers, newest first
+        </Text>
+        <Text style={styles.linkRowAction}>Open</Text>
+      </Pressable>
+
       {joinRequests.length > 0 && (
         <>
           <Text style={styles.sectionHeader}>
@@ -601,6 +620,23 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   requestActions: { flexDirection: 'row', marginTop: spacing.sm },
+  /**
+   * A destination, not an action, so it is a row with an "Open" affordance
+   * rather than a button — shaped like the invitation banner on the groups list
+   * for the same reason: both are "there is more of this through here".
+   */
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  linkRowText: { flex: 1, fontSize: fontSize.sm, color: colors.text, paddingRight: spacing.sm },
+  linkRowAction: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1083,4 +1083,33 @@ export function materialNote(messageBody: string, fileName: string): string | nu
   return body;
 }
 
+/**
+ * When a file was shared, for a list that has no day separators above it.
+ *
+ * The timeline card gets a bare clock from `formatClock`, because a day
+ * separator sits above it and supplies the date. The files tab has no
+ * separators — it is one flat list of everything the group has ever shared — so
+ * a row reading "4:05pm" there could be from any week of the term.
+ *
+ * Today and yesterday keep the clock, because "before or after this morning's
+ * lecture" is a thing a student is genuinely asking about a file that new. Older
+ * than that the clock has stopped meaning anything and only the day is printed,
+ * which also keeps the label short enough to sit beside the card's eyebrow on a
+ * 360dp phone.
+ *
+ * `now` is injected for the same reason `dayLabel`'s is: the boundaries are the
+ * whole behaviour, and they have to be testable without waiting for midnight.
+ */
+export function materialWhenLabel(iso: string, now: Date = new Date()): string {
+  const dayKey = localDayKey(iso);
+  if (dayKey === '') return '';
+  const day = dayLabel(dayKey, now);
+  // "Tomorrow" is unreachable — a file that has been shared was shared in the
+  // past — and a device clock skewed far enough to produce it falls through to
+  // the day-only branch, which is still readable.
+  return day === 'Today' || day === 'Yesterday'
+    ? `${day} · ${formatClock(iso)}`
+    : day;
+}
+
 

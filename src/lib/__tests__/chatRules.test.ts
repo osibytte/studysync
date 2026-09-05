@@ -38,6 +38,7 @@ import {
   materialNote,
   materialStateLabel,
   materialStoragePath,
+  materialWhenLabel,
   nextPageCursor,
   normaliseMessageBody,
   proposalDayOptions,
@@ -1585,6 +1586,39 @@ describe('materialNote', () => {
   it('says nothing rather than printing whitespace', () => {
     expect(materialNote('', 'a.pdf')).toBeNull();
     expect(materialNote('   ', 'a.pdf')).toBeNull();
+  });
+});
+
+describe('materialWhenLabel', () => {
+  const now = new Date(2026, 8, 20, 15, 0); // 20 September 2026, local
+
+  it('keeps the clock for today and yesterday', () => {
+    // The files tab has no day separators, so the day has to be in the row —
+    // and for something this recent the time of day is still worth knowing.
+    expect(materialWhenLabel(localIso(2026, 9, 20, 16, 5), now)).toBe('Today · 4:05pm');
+    expect(materialWhenLabel(localIso(2026, 9, 19, 8, 0), now)).toBe('Yesterday · 8am');
+  });
+
+  it('drops the clock for anything older', () => {
+    expect(materialWhenLabel(localIso(2026, 9, 5, 16, 5), now)).toBe('5 September');
+    expect(materialWhenLabel(localIso(2026, 9, 18, 23, 59), now)).toBe('18 September');
+  });
+
+  it('keeps the year once the file is from another one', () => {
+    expect(materialWhenLabel(localIso(2025, 11, 30, 9, 0), now)).toBe('30 November 2025');
+  });
+
+  it('crosses a year boundary to find yesterday', () => {
+    expect(
+      materialWhenLabel(localIso(2025, 12, 31, 21, 30), new Date(2026, 0, 1, 9, 0))
+    ).toBe('Yesterday · 9:30pm');
+  });
+
+  it('renders nothing for an unparseable instant, rather than "Invalid Date"', () => {
+    // A bad row should cost its own row's timestamp and nothing else — the card
+    // renders an empty string in the corner and the file is still downloadable.
+    expect(materialWhenLabel('not a date', now)).toBe('');
+    expect(materialWhenLabel('', now)).toBe('');
   });
 });
 

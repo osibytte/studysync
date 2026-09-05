@@ -50,7 +50,7 @@ import { displayName, isCreator } from '@/lib/groupRules';
 import { makeActionId } from '@/lib/ids';
 import { enqueue, pendingActions } from '@/lib/outbox';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type {
   GroupMaterialRow,
   GroupSessionRow,
@@ -723,6 +723,24 @@ export default function ChatScreen() {
             {members.length} {members.length === 1 ? 'member' : 'members'}
           </Text>
         </View>
+        {/*
+          The second place a file can be reached from, and the one that matters
+          most: files are shared here, so "where did that PDF go" is asked here.
+          A word rather than an icon, for the reason `FileCard`'s tile letters
+          give — there is no icon set installed, and an emoji glyph is missing on
+          exactly the older Android builds this app is aimed at.
+        */}
+        {!!gid && (
+          <Pressable
+            onPress={() => router.push(`/(app)/groups/${gid}/files`)}
+            accessibilityRole="button"
+            accessibilityLabel="Shared files"
+            accessibilityHint="Every file this group has shared, newest first"
+            style={styles.headerAction}
+          >
+            <Text style={styles.headerActionText}>Files</Text>
+          </Pressable>
+        )}
       </View>
 
       {(!!actionError || !!status) && (
@@ -792,6 +810,13 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   headerTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   headerMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  /** Same 44pt as the Back target opposite it, so the header row stays even. */
+  headerAction: {
+    minHeight: MIN_TOUCH,
+    justifyContent: 'center',
+    paddingLeft: spacing.sm,
+  },
+  headerActionText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   banner: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,

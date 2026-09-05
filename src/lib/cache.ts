@@ -42,6 +42,14 @@ export const CacheKeys = {
   // a student may read of a group depends on their membership.
   chat: (userId: string, groupId: string) =>
     `${PREFIX}:user:${userId}:chat:${groupId}`,
+
+  // Stage 4. Every file a group has shared, including the removed ones, so the
+  // files tab opens with the list on screen and no connection. Separate from
+  // `chat` above rather than folded into it: that entry holds one page of the
+  // timeline and the cards it points at, and a file shared a month ago is off
+  // the end of that page while still belonging in this list.
+  materials: (userId: string, groupId: string) =>
+    `${PREFIX}:user:${userId}:materials:${groupId}`,
 } as const;
 
 interface Envelope<T> {
