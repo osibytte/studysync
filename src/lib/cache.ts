@@ -56,6 +56,14 @@ export const CacheKeys = {
   // connection, and it is why a failed fetch can never be mistaken for "you have
   // no study times" and quietly cancel them all. See src/lib/reminders.ts.
   reminders: (userId: string) => `${PREFIX}:user:${userId}:reminders`,
+
+  // Stage 5. The newest page of the in-app inbox, so opening it with no
+  // connection still shows what the student was told. Worth caching even though a
+  // notification is old news by the time it is read: the inbox is where somebody
+  // goes to find the study time they were told about and then forgot, and that is
+  // exactly the moment they are on a bus with no signal. Per-user, like every
+  // other entry — a notification is addressed to one student by name.
+  notifications: (userId: string) => `${PREFIX}:user:${userId}:notifications`,
 } as const;
 
 interface Envelope<T> {

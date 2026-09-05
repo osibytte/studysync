@@ -52,6 +52,26 @@ export interface NotificationPrefs {
   nudge_unanswered_invitation?: boolean;
 }
 
+/**
+ * The jsonb keys that switch a category of notification off, derived from
+ * `NotificationPrefs` rather than typed out again.
+ *
+ * Derived on purpose: add a `notify_*` or `nudge_*` key above and it joins this
+ * union automatically, which breaks `NOTIFICATION_PREF_KEY` and
+ * `NOTIFICATION_SWITCH` in `notificationRules.ts` until the new switch has been
+ * given a kind to govern and wording for the prefs screen. A hand-written union
+ * would instead let a key exist that no screen ever shows and no sender ever
+ * reads — which is the same silent-drift failure the availability bitmask and the
+ * `kind` CHECK are both mirrored against.
+ *
+ * `quiet_hours_*`, `daily_cap` and `push_enabled` are deliberately excluded: they
+ * are not per-category switches, and each has its own control.
+ */
+export type NotificationSwitchKey = Extract<
+  keyof NotificationPrefs,
+  `notify_${string}` | `nudge_${string}`
+>;
+
 export interface AppUser {
   user_id: string;
   full_name: string | null;
@@ -549,10 +569,10 @@ export interface GroupMaterialRow {
 
 /**
  * Every kind of notification the app can send. One definition, imported by
- * `notificationRules.ts`, which keys four exhaustive `Record`s on it — so adding a
+ * `notificationRules.ts`, which keys five exhaustive `Record`s on it — so adding a
  * member here fails the typecheck until the copy, the urgency, the
- * local-vs-remote answer and the cooldown have all been supplied for it. That is
- * deliberate.
+ * local-vs-remote answer, the cooldown and the pref switch that silences it have
+ * all been supplied for it. That is deliberate.
  *
  * `'session_reminder'` is in the union but **cannot appear in the notifications
  * table** — see the check constraint in `0019`. It is scheduled on the device by

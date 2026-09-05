@@ -1,8 +1,18 @@
-import { formatClock, formatDuration, sessionWhenLabel } from '@/lib/chatRules';
+import {
+  dayLabel,
+  formatClock,
+  formatDuration,
+  localDayKey,
+  materialWhenLabel,
+  sessionWhenLabel,
+} from '@/lib/chatRules';
+import { DEFAULT_NOTIFICATION_PREFS } from '@/types/database';
 import type {
   GroupSessionRow,
+  Notification,
   NotificationKind,
   NotificationPrefs,
+  NotificationSwitchKey,
 } from '@/types/database';
 
 /**
@@ -37,7 +47,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 /**
- * The kinds, and the four tables every one of them must appear in.
+ * The kinds, and the five tables every one of them must appear in.
  *
  * `NotificationKind` itself lives in `@/types/database` beside the `notifications`
  * row shape it constrains, because `0019`'s check constraint is the other half of
@@ -52,6 +62,10 @@ import type {
  * four proposed in HANDOFF §8. They are a union member each, so adding one broke
  * every `Record<NotificationKind, …>` below until it was answered for, which is
  * exactly why it was written that way.
+ *
+ * The five: `NOTIFICATION_KIND_LABEL` (wording), `NOTIFICATION_URGENT` (does it
+ * bypass the cap), `NOTIFICATION_LOCAL` (device or server), `NOTIFICATION_COOLDOWN`
+ * (how often at most) and `NOTIFICATION_PREF_KEY` (which switch turns it off).
  */
 
 /** Wording for the prefs screen's per-kind switches (step 5). */
@@ -196,6 +210,384 @@ export const NOTIFICATION_COOLDOWN: Record<NotificationKind, NotificationCooldow
   group_quiet: 'fortnight',
   invitation_unanswered: 'none',
 };
+
+// ---------------------------------------------------------------------------
+// The switches — which pref key turns each kind off (step 5's prefs screen)
+// ---------------------------------------------------------------------------
+
+/**
+ * Which `notification_prefs` key governs each kind, and the fifth exhaustive
+ * table a new kind has to be answered for.
+ *
+ * `shouldNotify` takes `kindEnabled` as a plain map rather than reading prefs
+ * itself, which left the kind-to-key mapping unwritten: the prefs screen and the
+ * Edge Function would each have invented one, and the first disagreement would be
+ * a switch a student turned off that kept sending. So it is stated once, here,
+ * beside the labels and the urgency.
+ *
+ * `session_reminder` maps to **null** and that is the design, not a gap. The
+ * 30-minute alarm is scheduled by the device and governed by the OS — a switch
+ * here would be a lie, because turning it off in the app cannot cancel an alarm
+ * the OS has already accepted, and `notifier.ts` never asks. The student turns it
+ * off in Settings, or by declining the permission prompt on the *yes* tap.
+ *
+ * Several kinds deliberately share a key: nobody wants a group's study times
+ * split into three switches, so proposed/confirmed/cancelled ride together on
+ * `notify_sessions`. The four nudges each get their own, because the whole point
+ * of nudges is that a student keeps the one they like and silences the rest.
+ */
+export const NOTIFICATION_PREF_KEY: Record<NotificationKind, NotificationSwitchKey | null> = {
+  session_reminder: null,
+  session_proposed: 'notify_sessions',
+  session_confirmed: 'notify_sessions',
+  session_cancelled: 'notify_sessions',
+  message_activity: 'notify_chat',
+  file_shared: 'notify_files',
+  invitation: 'notify_invitations',
+  session_needs_one_yes: 'nudge_needs_one_yes',
+  group_free_slot: 'nudge_free_slot',
+  group_quiet: 'nudge_group_quiet',
+  invitation_unanswered: 'nudge_unanswered_invitation',
+};
+
+/**
+ * Is this kind switched on for this student?
+ *
+ * **Absent means ON**, and that is the normal case rather than an edge one:
+ * `0001`'s jsonb default carries none of these keys, so every account created
+ * before Stage 5 is missing all eight and there is no backfill. Only an explicit
+ * `false` silences anything. A kind with no key (the local alarm) is always on as
+ * far as this app is concerned — the OS has the only switch that matters.
+ */
+export function isKindEnabled(prefs: NotificationPrefs, kind: NotificationKind): boolean {
+  const key = NOTIFICATION_PREF_KEY[kind];
+  if (key === null) return true;
+  return prefs[key] !== false;
+}
+
+/**
+ * Prefs to the map `shouldNotify` wants. One caller, one meaning, no drift — the
+ * sender builds it the same way the prefs screen reads it.
+ */
+export function kindEnabledFromPrefs(
+  prefs: NotificationPrefs
+): Partial<Record<NotificationKind, boolean>> {
+  const out: Partial<Record<NotificationKind, boolean>> = {};
+  for (const kind of Object.keys(NOTIFICATION_PREF_KEY) as NotificationKind[]) {
+    out[kind] = isKindEnabled(prefs, kind);
+  }
+  return out;
+}
+
+export interface NotificationSwitchMeta {
+  label: string;
+  /**
+   * The one line under the label. Where a kind has a cooldown, this is where the
+   * student is told — "at most once a week" is the difference between a setting
+   * they trust and one they switch off to find out what it does.
+   */
+  hint: string;
+  /** Engagement rather than information, so the screen can group and explain them. */
+  nudge: boolean;
+}
+
+/** Wording for the prefs screen, one entry per switch rather than per kind. */
+export const NOTIFICATION_SWITCH: Record<NotificationSwitchKey, NotificationSwitchMeta> = {
+  notify_chat: {
+    label: 'New messages',
+    hint: 'One summary per group, never one per message.',
+    nudge: false,
+  },
+  notify_files: {
+    label: 'Shared files',
+    hint: 'When somebody adds a file to a group.',
+    nudge: false,
+  },
+  notify_sessions: {
+    label: 'Study times',
+    hint: 'Proposed, confirmed and cancelled. The 30-minute alarm is separate.',
+    nudge: false,
+  },
+  notify_invitations: {
+    label: 'Group invitations',
+    hint: 'When somebody invites you to a group.',
+    nudge: false,
+  },
+  nudge_needs_one_yes: {
+    label: 'One more yes',
+    hint: 'When a study time needs a single yes to be confirmed.',
+    nudge: true,
+  },
+  nudge_free_slot: {
+    label: 'When your group is all free',
+    hint: 'At most once a week, and only for a slot everybody has open.',
+    nudge: true,
+  },
+  nudge_group_quiet: {
+    label: 'When a group goes quiet',
+    hint: 'At most once a fortnight.',
+    nudge: true,
+  },
+  nudge_unanswered_invitation: {
+    label: 'Invitations you have not answered',
+    hint: 'One reminder per invitation, never a second.',
+    nudge: true,
+  },
+};
+
+/**
+ * Screen order: the four things that happened, then the four nudges.
+ *
+ * A separate array because `Record` key order is not something to render off —
+ * and a test asserts it covers every key exactly once, so a ninth switch cannot
+ * be added to the type and then quietly never shown.
+ */
+export const NOTIFICATION_SWITCH_ORDER: readonly NotificationSwitchKey[] = [
+  'notify_chat',
+  'notify_sessions',
+  'notify_files',
+  'notify_invitations',
+  'nudge_needs_one_yes',
+  'nudge_free_slot',
+  'nudge_group_quiet',
+  'nudge_unanswered_invitation',
+];
+
+export interface NotificationSwitchRow extends NotificationSwitchMeta {
+  key: NotificationSwitchKey;
+  /** Current value, with an absent key read as on. */
+  enabled: boolean;
+  /** The kinds this row governs — what the switch actually silences. */
+  kinds: NotificationKind[];
+}
+
+/** The prefs screen's rows, in order, resolved against one student's prefs. */
+export function notificationSwitchRows(prefs: NotificationPrefs): NotificationSwitchRow[] {
+  return NOTIFICATION_SWITCH_ORDER.map((key) => ({
+    key,
+    ...NOTIFICATION_SWITCH[key],
+    enabled: prefs[key] !== false,
+    kinds: (Object.keys(NOTIFICATION_PREF_KEY) as NotificationKind[]).filter(
+      (kind) => NOTIFICATION_PREF_KEY[kind] === key
+    ),
+  }));
+}
+
+/**
+ * Chips rather than a number field, because a cap is a choice between a few
+ * sensible answers and a keyboard invites 0 typed as 100.
+ *
+ * **Zero is on the list and it is not a mistake.** `isDailyCapReached` reads it as
+ * "silence every non-urgent notification", a legitimate setting for a student who
+ * only wants to hear that a session was confirmed or called off — and the label
+ * has to say so, or it reads as "off" and gets picked by somebody who then
+ * wonders why the app went quiet.
+ */
+export const DAILY_CAP_CHOICES: readonly number[] = [0, 1, 2, 3, 5, 10];
+
+export function dailyCapLabel(cap: number): string {
+  if (!Number.isFinite(cap) || cap <= 0) return 'Urgent only';
+  return cap === 1 ? '1 a day' : `${cap} a day`;
+}
+
+/** Whole hours only: 48 half-hour chips is a worse screen than a coarser window. */
+export const QUIET_HOUR_CHOICES: readonly string[] = Array.from(
+  { length: 24 },
+  (_, hour) => `${String(hour).padStart(2, '0')}:00`
+);
+
+/**
+ * Is a quiet-hours window actually in force?
+ *
+ * Equal start and end is `isWithinQuietHours`'s own definition of "off", so the
+ * screen needs no third setting and no extra jsonb key to express it — turning
+ * quiet hours off is setting the end to the start. Two facts, one representation.
+ */
+export function quietHoursEnabled(
+  prefs: Pick<NotificationPrefs, 'quiet_hours_start' | 'quiet_hours_end'>
+): boolean {
+  const start = parseClockMinutes(prefs.quiet_hours_start);
+  const end = parseClockMinutes(prefs.quiet_hours_end);
+  return start !== null && end !== null && start !== end;
+}
+
+/** "22:00 to 07:00, overnight" — the wrap named, because it surprises people. */
+export function quietHoursLabel(
+  prefs: Pick<NotificationPrefs, 'quiet_hours_start' | 'quiet_hours_end'>
+): string {
+  if (!quietHoursEnabled(prefs)) return 'Off — notifications can arrive at any hour';
+  const start = parseClockMinutes(prefs.quiet_hours_start) as number;
+  const end = parseClockMinutes(prefs.quiet_hours_end) as number;
+  const wraps = start > end;
+  return `${prefs.quiet_hours_start} to ${prefs.quiet_hours_end}${wraps ? ', overnight' : ''}`;
+}
+
+/**
+ * One student's prefs with every missing key filled from `0001`'s defaults.
+ *
+ * The screen needs a complete object to render a switch position and a chip
+ * selection, and `notification_prefs` is jsonb: a row written before Stage 5 has
+ * four keys, a row written by an older client could have any subset, and a row
+ * hand-edited in the dashboard could have none. Merging once here means no screen
+ * has to decide what an absent `daily_cap` looks like — and the per-kind keys are
+ * deliberately left absent rather than defaulted to `true`, so saving the screen
+ * without touching a switch does not write eight keys that mean nothing.
+ */
+export function withNotificationDefaults(
+  prefs: Partial<NotificationPrefs> | null | undefined
+): NotificationPrefs {
+  return { ...DEFAULT_NOTIFICATION_PREFS, ...(prefs ?? {}) };
+}
+
+// ---------------------------------------------------------------------------
+// The in-app inbox (step 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many of these has the student not dismissed?
+ *
+ * Counted from the rows on screen rather than asked of the server, because the
+ * inbox already holds them and a second round trip would be a number that can
+ * disagree with the list under it. The badge on home is the one that asks the
+ * server, for the same reason `useUnread` does.
+ */
+export function countUnreadNotifications(rows: readonly Pick<Notification, 'read_at'>[]): number {
+  return rows.reduce((n, row) => (row.read_at === null ? n + 1 : n), 0);
+}
+
+/** "Today · 4:05pm", "Yesterday · 8am", "3 Sep" — a notification is always past. */
+export function notificationWhenLabel(iso: string, now: Date = new Date()): string {
+  return materialWhenLabel(iso, now);
+}
+
+export interface InboxNotificationItem {
+  type: 'notification';
+  key: string;
+  row: Notification;
+}
+
+export interface InboxDayItem {
+  type: 'day';
+  key: string;
+  label: string;
+}
+
+export type InboxItem = InboxNotificationItem | InboxDayItem;
+
+/**
+ * The inbox as a flat list with day headers, newest first — the same shape and
+ * the same reason as `buildTimeline`: one array a `FlatList` can render without
+ * deciding anything, so the ordering rule is testable without a renderer.
+ *
+ * Rows are NOT re-sorted. They arrive from `0019`'s keyset index
+ * `(user_id, created_at desc, notification_id desc)` and re-sorting here on
+ * `created_at` alone would break the tie the index resolves, dropping or
+ * repeating a row across pages.
+ */
+export function buildInbox(rows: readonly Notification[], now: Date = new Date()): InboxItem[] {
+  const items: InboxItem[] = [];
+  let lastDayKey = '';
+  for (const row of rows) {
+    const dayKey = localDayKey(row.created_at);
+    if (dayKey !== lastDayKey) {
+      items.push({ type: 'day', key: `day:${dayKey}`, label: dayLabel(dayKey, now) });
+      lastDayKey = dayKey;
+    }
+    items.push({ type: 'notification', key: row.notification_id, row });
+  }
+  return items;
+}
+
+/**
+ * Newest first, `notification_id` breaking the tie — the exact order of
+ * `notifications_inbox_idx (user_id, created_at desc, notification_id desc)`.
+ *
+ * Both columns, for the reason `compareMessagesNewestFirst` needs both: a sender
+ * fan-out writes every recipient's row in one statement, so `now()` is identical
+ * across them, and an order that only looks at `created_at` is unstable exactly
+ * where the keyset cursor has to be stable.
+ */
+export function compareNotificationsNewestFirst(a: Notification, b: Notification): number {
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? 1 : -1;
+  if (a.notification_id === b.notification_id) return 0;
+  return a.notification_id < b.notification_id ? 1 : -1;
+}
+
+/** Where the next (older) page starts. Null when nothing is loaded yet. */
+export interface NotificationCursor {
+  created_at: string;
+  notification_id: string;
+}
+
+/**
+ * The keyset cursor for "load older": the oldest notification currently held.
+ *
+ * Both columns again. Asking only for `created_at < cursor` drops every row
+ * sharing that instant, and a dropped notification appears in neither page — the
+ * student is never told, and nothing anywhere says so.
+ */
+export function nextInboxCursor(
+  rows: readonly Notification[]
+): NotificationCursor | null {
+  if (rows.length === 0) return null;
+  let oldest = rows[0];
+  for (const row of rows) {
+    if (compareNotificationsNewestFirst(row, oldest) > 0) oldest = row;
+  }
+  return { created_at: oldest.created_at, notification_id: oldest.notification_id };
+}
+
+/**
+ * Merge a fetched page into what is held, keyed by id and re-sorted.
+ *
+ * By id rather than by concatenation, because the same row legitimately arrives
+ * twice: the boundary row of a keyset page, and a refetch on focus overlapping a
+ * page already loaded. Appending would render it twice, and the duplicate would
+ * be a notification the student has to dismiss twice.
+ */
+export function upsertNotifications(
+  current: readonly Notification[],
+  incoming: readonly Notification[]
+): Notification[] {
+  if (incoming.length === 0) return [...current];
+  const byId = new Map<string, Notification>();
+  for (const row of current) byId.set(row.notification_id, row);
+  for (const row of incoming) byId.set(row.notification_id, row);
+  return [...byId.values()].sort(compareNotificationsNewestFirst);
+}
+
+/**
+ * Stamp one row read locally, for the optimistic tap.
+ *
+ * `??=` semantics, not assignment: an already-read row keeps its original
+ * `read_at`, matching `mark_notification_read`'s `coalesce(read_at, now())`. If
+ * the client moved the timestamp and the server did not, the row would jump
+ * position after the next fetch — the screen re-sorting under a thumb that has
+ * only just tapped it.
+ *
+ * The row stays in the list. A dismissal that made it vanish would leave the
+ * student no way back to something they tapped by accident; the screen renders it
+ * dimmed instead.
+ */
+export function applyNotificationRead(
+  rows: readonly Notification[],
+  notificationId: string,
+  at: string
+): Notification[] {
+  return rows.map((row) =>
+    row.notification_id === notificationId && row.read_at === null
+      ? { ...row, read_at: at }
+      : row
+  );
+}
+
+/** The same, for "clear all": every unread row, one instant. */
+export function applyAllNotificationsRead(
+  rows: readonly Notification[],
+  at: string
+): Notification[] {
+  return rows.map((row) => (row.read_at === null ? { ...row, read_at: at } : row));
+}
 
 // ---------------------------------------------------------------------------
 // Quiet hours — the part that is wrong in every first attempt
