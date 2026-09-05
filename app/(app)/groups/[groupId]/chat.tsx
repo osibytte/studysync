@@ -3,12 +3,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Composer } from '@/components/Composer';
+import { FileCard } from '@/components/FileCard';
 import { MessageBubble } from '@/components/MessageBubble';
 import { ProposeTimeSheet, type ProposalInput } from '@/components/ProposeTimeSheet';
 import { Screen } from '@/components/Screen';
@@ -21,25 +23,36 @@ import { useSessionAttendees } from '@/hooks/useSessionAttendees';
 import {
   cancelSession,
   deleteMyMessage,
+  materialDownloadUrl,
   proposeSession,
+  removeFile,
   respondToSession,
   sendMessage,
+  shareFile,
 } from '@/lib/chat';
 import {
   buildTimeline,
   canCancelSession,
+  canDeleteMaterial,
   canDeleteMessage,
+  canDownloadMaterial,
+  formatClock,
+  materialNote,
+  materialStateLabel,
   normaliseMessageBody,
   sessionWhenLabel,
+  sharedFileBody,
   validateMessageBody,
 } from '@/lib/chatRules';
 import type { TimelineItem } from '@/lib/chatRules';
+import { pickMaterial } from '@/lib/filePicker';
 import { displayName, isCreator } from '@/lib/groupRules';
 import { makeActionId } from '@/lib/ids';
 import { enqueue, pendingActions } from '@/lib/outbox';
 import { friendlyError } from '@/lib/supabase';
 import { colors, fontSize, radius, spacing } from '@/theme';
 import type {
+  GroupMaterialRow,
   GroupSessionRow,
   Message,
   SessionAttendeeRow,
@@ -49,7 +62,8 @@ import type {
 /**
  * A group's conversation — and, because a study time is something a group agrees
  * to in conversation, the only place study times are proposed, answered and
- * called off. There is deliberately no sessions screen.
+ * called off. Shared files land here for the same reason. There is deliberately
+ * no sessions screen.
  *
  * WHAT IS QUEUEABLE HERE AND WHAT IS NOT is the whole shape of this screen, and
  * the rule is the one `outbox.ts` states: does landing late change what the
@@ -68,9 +82,15 @@ import type {
  *   both are online-only. "The meeting is off" arriving after everyone has
  *   travelled is worse than a cancel that refused to queue.
  *
+ *   Sharing or removing a file — the question does not even arise. The outbox
+ *   stores JSON in AsyncStorage; an upload is bytes, and a removal needs the
+ *   bucket to answer before the row may be stamped (invariant 8). Both are
+ *   online-only, and the card and the ＋ menu both say so rather than failing.
+ *
  * Sender names come from the roster, never from the message row: RLS on
  * `public.users` is own-row only, so `sender_id` is genuinely all a message
- * carries.
+ * carries. A `materials` row is the exception — `group_materials` is a definer
+ * RPC, so it can join `uploader_name` in.
  */
 export default function ChatScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
@@ -85,6 +105,7 @@ export default function ChatScreen() {
   const {
     messages,
     sessions,
+    materials,
     loading,
     error,
     hasMore,
@@ -98,6 +119,8 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [proposing, setProposing] = useState(false);
+  /** True from the moment the picker returns a file to the end of the upload. */
+  const [sharing, setSharing] = useState(false);
   /** `{ id, key }` so only the pressed control on the pressed card spins. */
   const [busy, setBusy] = useState<{ id: string; key: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -405,6 +428,146 @@ export default function ChatScreen() {
     }
   }
 
+  /**
+   * Share a file: check the note, pick the file, upload the bytes, then put the
+   * card on the timeline.
+   *
+   * THE ONLY WRITE HERE WITH NO OPTIMISTIC ROW AHEAD OF IT. A message bubble
+   * appears instantly because a queued message is genuinely as good as a sent one;
+   * an upload is not. Twenty-five megabytes over hostel wifi takes as long as it
+   * takes, and a card that appeared immediately would be claiming the group can
+   * already download something that is still going up. So the status line says
+   * what is happening and the card arrives when the bytes have.
+   *
+   * The row is merged in afterwards anyway, rather than left to Realtime. The
+   * INSERT does come over the socket — that is how the other members get it — but
+   * a channel that dropped during a long upload would leave the sharer looking at
+   * a conversation missing the file they just shared. `refreshCards` runs first so
+   * the `materials` row is in hand and it renders as a card rather than flickering
+   * through the bubble fallback.
+   *
+   * WHAT YOU HAVE TYPED BECOMES THE NOTE, which the ＋ menu says before you tap.
+   * It is checked here rather than after the picker for the obvious reason: being
+   * told the message is too long is much less annoying before choosing a file than
+   * after. An empty field simply means no note, and `attach_material` writes
+   * "Shared <name>" instead — `sharedFileBody` is that default, mirrored so the
+   * row merged in below reads exactly as the one Postgres wrote.
+   */
+  async function handleShareFile() {
+    if (!userId || !gid) return;
+    setActionError(null);
+    setStatus(null);
+
+    const typed = normaliseMessageBody(draft);
+    const noteProblem = typed === '' ? null : validateMessageBody(draft);
+    if (noteProblem !== null) {
+      setActionError(
+        `${noteProblem}. Shorten it, or clear the field to share the file on its own.`
+      );
+      return;
+    }
+    const note = typed === '' ? null : typed;
+
+    const picked = await pickMaterial();
+    if (picked.status === 'cancelled') return;
+    if (picked.status === 'refused') {
+      setActionError(picked.reason);
+      return;
+    }
+
+    const { fileName, mimeType, sizeBytes, body } = picked.file;
+    const materialId = makeActionId();
+    const messageId = makeActionId();
+
+    setSharing(true);
+    setStatus(`Uploading ${fileName}…`);
+    try {
+      await shareFile({
+        groupId: gid,
+        materialId,
+        messageId,
+        fileName,
+        mimeType,
+        sizeBytes,
+        body,
+        note,
+      });
+      await refreshCards();
+      mergeLocal([
+        {
+          message_id: messageId,
+          group_id: gid,
+          sender_id: userId,
+          body: sharedFileBody(note, fileName),
+          kind: 'file',
+          session_id: null,
+          material_id: materialId,
+          // The device clock, replaced by the server's when the echo lands.
+          created_at: new Date().toISOString(),
+          deleted_at: null,
+        },
+      ]);
+      setDraft('');
+      setStatus(`Shared ${fileName}.`);
+    } catch (err) {
+      // `shareFile` has already taken the bytes back out if nothing claims them,
+      // so there is no half-shared file to explain — just a failure.
+      setStatus(null);
+      setActionError(friendlyError(err));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  /**
+   * Sign a URL and hand it to the OS.
+   *
+   * Signed at tap time and never cached: sixty seconds is long enough for the
+   * browser to start and short enough that a link which leaks is already dead.
+   * Signing is itself gated by the Storage read policy, so a file removed while
+   * this screen was open refuses here rather than downloading.
+   *
+   * What happens next is the OS handler's business, and that is the point — a
+   * PDF opens in a viewer, a zip lands in Downloads. This app has no business
+   * reimplementing either.
+   */
+  async function handleDownload(material: GroupMaterialRow) {
+    setActionError(null);
+    setStatus(null);
+    setBusy({ id: material.material_id, key: 'download' });
+    try {
+      const url = await materialDownloadUrl(material.storage_path);
+      await Linking.openURL(url);
+    } catch (err) {
+      setActionError(friendlyError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * Remove a shared file. Bytes first, then the row — `removeFile` holds that
+   * order and says why at length.
+   *
+   * `refreshCards` is not optional here. This screen subscribes to `messages` and
+   * nothing else, and a removal writes no message — so without the refetch the
+   * card would keep offering a Download that now signs nothing.
+   */
+  async function handleRemove(material: GroupMaterialRow) {
+    setActionError(null);
+    setStatus(null);
+    setBusy({ id: material.material_id, key: 'remove' });
+    try {
+      await removeFile(material.material_id, material.storage_path);
+      await refreshCards();
+      setStatus(`Removed ${material.file_name}. The group cannot download it now.`);
+    } catch (err) {
+      setActionError(friendlyError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   /* ----------------------------------------------------------------------- */
   /* Rendering                                                                */
   /* ----------------------------------------------------------------------- */
@@ -455,10 +618,46 @@ export default function ChatScreen() {
     }
 
     /**
-     * Everything else is a bubble, including a `file` message — Stage 4 adds the
-     * card, and until then `body` is a readable sentence about the file, which is
-     * exactly what `renderKind`'s fallback is for. A session message whose row
-     * has not arrived lands here too.
+     * A shared file, when its `materials` row is in hand.
+     *
+     * `uploader_name` comes from the RPC because `group_materials` is a definer
+     * function; the roster is the fallback for the one case it cannot cover, a
+     * member who has since left. "Removed by" goes through a lowercasing wrapper
+     * for the same reason `SessionCard`'s proposer does — the roster answers "You",
+     * and the card renders it mid-sentence.
+     */
+    const material =
+      item.kind === 'file' && message.material_id
+        ? materials[message.material_id]
+        : undefined;
+
+    if (material) {
+      return (
+        <FileCard
+          material={material}
+          uploaderName={
+            (material.uploader_name ?? '').trim() || nameFor(material.uploaded_by)
+          }
+          isMine={material.uploaded_by === userId}
+          note={materialNote(message.body, material.file_name)}
+          removedLabel={materialStateLabel(material, (id) =>
+            id === userId ? 'you' : nameFor(id)
+          )}
+          time={formatClock(message.created_at)}
+          canRemove={canDeleteMaterial(material, userId, creator)}
+          downloadable={canDownloadMaterial(material)}
+          actionsDisabled={!isOnline}
+          busy={busy?.id === material.material_id ? busy.key : null}
+          onDownload={() => void handleDownload(material)}
+          onRemove={() => void handleRemove(material)}
+        />
+      );
+    }
+
+    /**
+     * Everything else is a bubble. That includes a `session` or `file` message
+     * whose row has not arrived yet, which is exactly what `renderKind`'s fallback
+     * is for: `body` carries a readable sentence about either.
      *
      * `deletable` gates the open confirm as well as the long press: going offline
      * with one open would otherwise leave a Delete button that can only fail.
@@ -498,8 +697,10 @@ export default function ChatScreen() {
             onChangeText={setDraft}
             onSend={() => void handleSend()}
             onProposeTime={() => setSheetOpen(true)}
+            onShareFile={() => void handleShareFile()}
             sending={sending}
             isOnline={isOnline}
+            shareDisabled={!isOnline || sharing}
           />
         )
       }
@@ -541,7 +742,7 @@ export default function ChatScreen() {
         <View style={styles.empty}>
           <Text style={styles.emptyText}>
             {error ??
-              'Nothing here yet. Say hello, or propose a time to study together — whatever you agree on becomes a card everybody can answer.'}
+              'Nothing here yet. Say hello, propose a time to study together, or share the notes — whatever the group agrees on becomes a card everybody can answer.'}
           </Text>
         </View>
       ) : (

@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { MATERIALS_ALLOWED_MIME_TYPES } from '../chatRules';
 
 /**
  * Mirror-drift guard.
@@ -141,5 +142,48 @@ describe('outbox ledger mirror: SELF_LEDGERED <-> claim_client_action in the mig
     // The reverse omission is harmless at runtime but means the list has grown a
     // name nothing sends — usually the residue of a renamed action.
     expect(selfLedgered.filter((action) => !replayed.includes(action))).toEqual([]);
+  });
+});
+
+/**
+ * Fourth mirror, and the one with the most expensive failure.
+ *
+ * The `group-materials` bucket carries an `allowed_mime_types` list (0017) and
+ * Storage enforces it, so it is the true set of types an upload can succeed with.
+ * `MATERIALS_ALLOWED_MIME_TYPES` is that list copied onto the device, where it
+ * does two things the server cannot: it filters the document picker, and
+ * `uploadMimeType` refuses anything outside it before a byte goes on the wire.
+ *
+ * Drift is silent in both directions and neither is cheap:
+ *
+ *   - A type on the device that the bucket does not allow is accepted by the
+ *     picker, uploaded in full, and rejected at the end. On a student's mobile
+ *     data that is the whole file paid for and nothing shared.
+ *   - A type the bucket allows that the device is missing is a file that cannot
+ *     be picked at all, and no error anywhere to explain why.
+ */
+function sqlBucketMimeTypes(): string[] {
+  const sql = read('supabase/migrations/0017_stage3_materials.sql').replace(/\r\n/g, '\n');
+  const insert = sql.indexOf('insert into storage.buckets');
+  expect(insert).toBeGreaterThanOrEqual(0);
+  const open = sql.indexOf('array[', insert);
+  expect(open).toBeGreaterThan(insert);
+  const close = sql.indexOf(']', open);
+  expect(close).toBeGreaterThan(open);
+  return [...sql.slice(open, close).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+}
+
+describe('bucket mime mirror: MATERIALS_ALLOWED_MIME_TYPES <-> storage.buckets in 0017', () => {
+  const fromSql = sqlBucketMimeTypes();
+
+  it('found both sides, so an empty parse cannot pass for agreement', () => {
+    expect(fromSql.length).toBeGreaterThanOrEqual(15);
+    expect(MATERIALS_ALLOWED_MIME_TYPES.length).toBe(fromSql.length);
+  });
+
+  it('allows exactly the same types', () => {
+    // Sorted, because the order in either place is arbitrary — Storage compares
+    // membership, and the picker does not care either.
+    expect([...MATERIALS_ALLOWED_MIME_TYPES].sort()).toEqual([...fromSql].sort());
   });
 });

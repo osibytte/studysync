@@ -973,3 +973,114 @@ export function canDownloadMaterial(
 ): boolean {
   return row.deleted_at === null;
 }
+
+/**
+ * The bucket's `allowed_mime_types`, mirrored from 0017.
+ *
+ * Storage enforces this list itself and rejects anything outside it, so it is not
+ * advice — it is the set of types an upload can possibly succeed with. Kept here
+ * as well because it has two jobs on the device that the server cannot do: it is
+ * handed to the document picker as its filter, which is what 0017's comment means
+ * by "a student who picks the wrong file gets told at the picker instead of after
+ * a 20 MB upload", and it is what `uploadMimeType` checks against.
+ *
+ * IF YOU CHANGE THE BUCKET, CHANGE THIS. A type here that the bucket does not
+ * take fails at the end of an upload; a type the bucket takes that is missing
+ * here is one a student cannot pick.
+ */
+export const MATERIALS_ALLOWED_MIME_TYPES: readonly string[] = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+];
+
+/**
+ * Extension → the allowed MIME type to upload it as. Only the extensions the
+ * bucket has a type for: this map exists to correct a picker, not to widen it.
+ */
+const UPLOAD_MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  md: 'text/markdown',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  zip: 'application/zip',
+};
+
+/**
+ * The type to upload a picked file AS — or null when there is no honest answer.
+ *
+ * Exists because a document picker's `mimeType` cannot be trusted. Android
+ * routinely reports `application/octet-stream` for a perfectly ordinary PDF, and
+ * a `type` the bucket does not allow is rejected by Storage AFTER the bytes have
+ * been sent, which on a student's mobile data is the most expensive possible way
+ * to find out. So: normalise, take the reported type if the bucket allows it,
+ * otherwise fall back to what the extension says, and otherwise refuse — before
+ * anything goes on the wire.
+ *
+ * Deliberately narrower than `fileKind`, which guesses a family for an icon and
+ * can afford to be wrong. This decides a header that has to be exactly right.
+ */
+export function uploadMimeType(reported: string | null | undefined, fileName: string): string | null {
+  // Strip parameters (`text/plain; charset=utf-8`) — the bucket compares the
+  // bare type, and RN hands the whole string through to the multipart part.
+  const mime = (reported ?? '').split(';')[0]!.trim().toLowerCase();
+  if (mime !== '' && MATERIALS_ALLOWED_MIME_TYPES.includes(mime)) return mime;
+  return UPLOAD_MIME_BY_EXTENSION[fileExtension(fileName)] ?? null;
+}
+
+/**
+ * The message body `attach_material` will write, computed here so the optimistic
+ * bubble and the row agree.
+ *
+ * Mirrors the SQL exactly:
+ * `coalesce(nullif(btrim(coalesce(p_note, '')), ''), 'Shared ' || v_name)` — a
+ * note if the student typed one, otherwise "Shared lecture-3.pdf". `v_name` is
+ * the trimmed file name the RPC stores, so this trims too.
+ */
+export function sharedFileBody(note: string | null | undefined, fileName: string): string {
+  const trimmed = (note ?? '').trim();
+  return trimmed !== '' ? trimmed : `Shared ${fileName.trim()}`;
+}
+
+/**
+ * What the file card should print above the file, or null when there is nothing
+ * to add.
+ *
+ * `attach_material` always writes a body, so a file message never has an empty
+ * one — but when the sharer typed no note that body is just "Shared
+ * lecture-3.pdf", and the card is already showing `lecture-3.pdf` in bold
+ * underneath. Printing both says the file name twice and reads like a bug.
+ *
+ * Compared against `sharedFileBody` rather than a prefix match, so a note that
+ * happens to begin "Shared " survives.
+ */
+export function materialNote(messageBody: string, fileName: string): string | null {
+  const body = messageBody.trim();
+  if (body === '' || body === sharedFileBody(null, fileName)) return null;
+  return body;
+}
+
+

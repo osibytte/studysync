@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   MESSAGE_MAX_LENGTH,
@@ -8,7 +8,8 @@ import {
 import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
- * The bar at the bottom of the chat: type a message, or propose a study time.
+ * The bar at the bottom of the chat: type a message, propose a study time, or
+ * share a file.
  *
  * A raw `TextInput` rather than `TextField`, which has no multiline prop and
  * carries a label and 16pt of bottom margin that a composer does not want. The
@@ -24,6 +25,13 @@ import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
  *
  * The height is capped at 5-ish lines so a long paragraph scrolls inside the
  * field instead of pushing the transcript off the screen.
+ *
+ * THE ＋ OPENS A MENU RATHER THAN DOING ONE THING, which it did until Stage 4
+ * gave it a second. Two 44pt buttons plus Send leave about 150pt for the field on
+ * a 360pt phone — nine characters — so the choice is a list above the bar, not
+ * another square beside it. It costs proposing a study time one extra tap, and
+ * that is the right thing to spend: it is the rarer of the two and neither is
+ * something a student does mid-sentence.
  */
 
 interface Props {
@@ -31,11 +39,14 @@ interface Props {
   onChangeText: (value: string) => void;
   onSend: () => void;
   onProposeTime: () => void;
+  onShareFile: () => void;
   /** True while a send is in flight. Offline sends are never in flight. */
   sending?: boolean;
   isOnline: boolean;
   /** Hides the propose button while the sheet is already open. */
   proposeDisabled?: boolean;
+  /** Offline, or while an upload is already running. Files are online-only. */
+  shareDisabled?: boolean;
 }
 
 export function Composer({
@@ -43,14 +54,24 @@ export function Composer({
   onChangeText,
   onSend,
   onProposeTime,
+  onShareFile,
   sending = false,
   isOnline,
   proposeDisabled = false,
+  shareDisabled = false,
 }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const problem = validateMessageBody(value);
   const sendable = problem === null && !sending;
   /** Only worth showing while it is actionable — not on every empty field. */
   const tooLong = normaliseMessageBody(value).length > MESSAGE_MAX_LENGTH;
+
+  /** Always close first: coming back from the OS picker should not find it open. */
+  const choose = (action: () => void) => {
+    setMenuOpen(false);
+    action();
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -60,20 +81,45 @@ export function Composer({
         </Text>
       )}
 
+      {menuOpen && (
+        <View style={styles.menu}>
+          <MenuItem
+            label="Propose a study time"
+            detail="Pick a day and time for the group to answer"
+            disabled={proposeDisabled}
+            onPress={() => choose(onProposeTime)}
+          />
+          <MenuItem
+            label="Share a file"
+            detail={
+              !isOnline
+                ? 'Needs a connection: bytes cannot wait in the outbox'
+                : normaliseMessageBody(value) !== ''
+                  ? 'What you have typed becomes the note on it'
+                  : 'Notes, slides, a past paper — up to 25 MB'
+            }
+            disabled={shareDisabled}
+            onPress={() => choose(onShareFile)}
+          />
+        </View>
+      )}
+
       <View style={styles.row}>
         <Pressable
-          onPress={onProposeTime}
-          disabled={proposeDisabled}
+          onPress={() => setMenuOpen((open) => !open)}
           accessibilityRole="button"
-          accessibilityLabel="Propose a study time"
-          accessibilityHint="Opens the day and time picker"
+          accessibilityLabel={menuOpen ? 'Close' : 'Add to the conversation'}
+          accessibilityHint={
+            menuOpen ? undefined : 'Propose a study time, or share a file'
+          }
+          accessibilityState={{ expanded: menuOpen }}
           style={({ pressed }) => [
             styles.propose,
-            proposeDisabled && styles.inactive,
-            pressed && !proposeDisabled && styles.pressed,
+            menuOpen && styles.proposeOpen,
+            pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.proposeText}>＋</Text>
+          <Text style={styles.proposeText}>{menuOpen ? '×' : '＋'}</Text>
         </Pressable>
 
         <TextInput
@@ -117,6 +163,38 @@ export function Composer({
   );
 }
 
+/** One row of the ＋ menu. Disabled it still shows, with `detail` saying why. */
+function MenuItem({
+  label,
+  detail,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  detail: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={detail}
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [
+        styles.menuItem,
+        disabled && styles.inactive,
+        pressed && !disabled && styles.pressed,
+      ]}
+    >
+      <Text style={styles.menuLabel}>{label}</Text>
+      <Text style={styles.menuDetail}>{detail}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: spacing.lg,
@@ -153,6 +231,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   proposeText: { fontSize: fontSize.lg, fontWeight: '600', color: colors.primary },
+  /** Reads as held down while its menu is showing, so the × has a home. */
+  proposeOpen: { backgroundColor: colors.surface, borderColor: colors.primary },
+  menu: {
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    minHeight: MIN_TOUCH,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  menuLabel: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  menuDetail: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
   send: {
     minHeight: MIN_TOUCH,
     paddingHorizontal: spacing.lg,

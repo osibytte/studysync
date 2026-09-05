@@ -1,5 +1,6 @@
 import {
   FILE_NAME_MAX_LENGTH,
+  MATERIALS_ALLOWED_MIME_TYPES,
   MESSAGE_MAX_LENGTH,
   PROPOSAL_DAYS_AHEAD,
   PROPOSAL_FIRST_HOUR,
@@ -34,6 +35,7 @@ import {
   isSessionPast,
   lastMessageLine,
   localDayKey,
+  materialNote,
   materialStateLabel,
   materialStoragePath,
   nextPageCursor,
@@ -45,9 +47,11 @@ import {
   sessionRuleLabel,
   sessionTallyLabel,
   sessionWhenLabel,
+  sharedFileBody,
   totalUnread,
   unreadBadge,
   unreadSummary,
+  uploadMimeType,
   upsertMessages,
   validateMessageBody,
   validateSessionProposal,
@@ -1454,3 +1458,133 @@ describe('canDeleteMaterial / canDownloadMaterial / materialStateLabel', () => {
     );
   });
 });
+
+describe('MATERIALS_ALLOWED_MIME_TYPES', () => {
+  it('is the fifteen types the bucket allows in 0017', () => {
+    expect(MATERIALS_ALLOWED_MIME_TYPES).toHaveLength(15);
+    expect(MATERIALS_ALLOWED_MIME_TYPES).toContain('application/pdf');
+    expect(MATERIALS_ALLOWED_MIME_TYPES).toContain(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    expect(MATERIALS_ALLOWED_MIME_TYPES).toContain('application/zip');
+  });
+
+  it('holds bare lowercase types, since that is what Storage compares', () => {
+    for (const mime of MATERIALS_ALLOWED_MIME_TYPES) {
+      expect(mime).toBe(mime.toLowerCase().trim());
+      expect(mime).not.toContain(';');
+      expect(mime.split('/')).toHaveLength(2);
+    }
+  });
+
+  it('never offers a type the bucket would reject', () => {
+    // The picker is handed this array as its filter, so anything in it that
+    // Storage does not take is a file a student can choose and then fail to
+    // upload. `uploadMimeType` is the same list, so it must accept all of it.
+    for (const mime of MATERIALS_ALLOWED_MIME_TYPES) {
+      expect(uploadMimeType(mime, 'whatever.bin')).toBe(mime);
+    }
+  });
+});
+
+describe('uploadMimeType', () => {
+  it('takes the picker at its word when the bucket allows the type', () => {
+    expect(uploadMimeType('application/pdf', 'notes.pdf')).toBe('application/pdf');
+    expect(uploadMimeType('image/png', 'diagram.png')).toBe('image/png');
+  });
+
+  it('normalises case, padding and a charset parameter', () => {
+    expect(uploadMimeType('  Application/PDF  ', 'notes.pdf')).toBe('application/pdf');
+    expect(uploadMimeType('text/plain; charset=utf-8', 'notes.txt')).toBe('text/plain');
+    expect(uploadMimeType('TEXT/CSV;charset=UTF-8', 'marks.csv')).toBe('text/csv');
+  });
+
+  it('corrects the octet-stream an Android picker reports for a real PDF', () => {
+    expect(uploadMimeType('application/octet-stream', 'lecture-3.pdf')).toBe('application/pdf');
+    expect(uploadMimeType('application/octet-stream', 'week1.docx')).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+  });
+
+  it('falls back to the extension when the picker reported nothing at all', () => {
+    // `DocumentPickerAsset.mimeType` is optional, so both of these happen.
+    expect(uploadMimeType(undefined, 'slides.pptx')).toBe(
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    );
+    expect(uploadMimeType(null, 'photo.JPEG')).toBe('image/jpeg');
+    expect(uploadMimeType('', 'sheet.xlsx')).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+  });
+
+  it('refuses rather than guessing when neither the type nor the name is allowed', () => {
+    expect(uploadMimeType('video/mp4', 'clip.mp4')).toBeNull();
+    expect(uploadMimeType('application/octet-stream', 'mystery')).toBeNull();
+    expect(uploadMimeType('application/x-rar-compressed', 'notes.rar')).toBeNull();
+    expect(uploadMimeType(undefined, '')).toBeNull();
+  });
+
+  it('is stricter than fileKind, which only has an icon riding on it', () => {
+    // fileKind maps .mp4 to a family happily; the bucket has no type for it, so
+    // the upload must never start.
+    expect(fileKind('video/mp4', 'clip.mp4')).toBe('video');
+    expect(uploadMimeType('video/mp4', 'clip.mp4')).toBeNull();
+  });
+});
+
+describe('sharedFileBody', () => {
+  it('mirrors the SQL default when no note was typed', () => {
+    expect(sharedFileBody(null, 'lecture-3.pdf')).toBe('Shared lecture-3.pdf');
+    expect(sharedFileBody(undefined, 'lecture-3.pdf')).toBe('Shared lecture-3.pdf');
+    expect(sharedFileBody('', 'lecture-3.pdf')).toBe('Shared lecture-3.pdf');
+    expect(sharedFileBody('   \n  ', 'lecture-3.pdf')).toBe('Shared lecture-3.pdf');
+  });
+
+  it('uses the note, trimmed, exactly as btrim would', () => {
+    expect(sharedFileBody('  week 3 notes  ', 'lecture-3.pdf')).toBe('week 3 notes');
+  });
+
+  it('trims the file name too, because attach_material stores it trimmed', () => {
+    expect(sharedFileBody(null, '  lecture-3.pdf ')).toBe('Shared lecture-3.pdf');
+  });
+
+  it('produces a body validateMessageBody would accept', () => {
+    // The RPC writes this straight into `messages.body`, so a name at the 255
+    // limit must not overflow the column's own bound.
+    const body = sharedFileBody(null, 'x'.repeat(FILE_NAME_MAX_LENGTH));
+    expect(validateMessageBody(body)).toBeNull();
+  });
+});
+
+describe('materialNote', () => {
+  it('drops the default body, which would print the file name twice', () => {
+    expect(materialNote('Shared lecture-3.pdf', 'lecture-3.pdf')).toBeNull();
+  });
+
+  it('keeps a real note', () => {
+    expect(materialNote('week 3 notes', 'lecture-3.pdf')).toBe('week 3 notes');
+  });
+
+  it('keeps a note that merely starts the same way as the default', () => {
+    expect(materialNote('Shared this one already, sorry', 'lecture-3.pdf')).toBe(
+      'Shared this one already, sorry'
+    );
+    expect(materialNote('Shared lecture-3.pdf earlier too', 'lecture-3.pdf')).toBe(
+      'Shared lecture-3.pdf earlier too'
+    );
+  });
+
+  it('round-trips whatever sharedFileBody produced', () => {
+    // The two are used together: one builds the body the RPC writes, the other
+    // reads it back, so a default must always come back as null and a note as
+    // itself.
+    expect(materialNote(sharedFileBody(null, 'a.pdf'), 'a.pdf')).toBeNull();
+    expect(materialNote(sharedFileBody('  hello  ', 'a.pdf'), 'a.pdf')).toBe('hello');
+  });
+
+  it('says nothing rather than printing whitespace', () => {
+    expect(materialNote('', 'a.pdf')).toBeNull();
+    expect(materialNote('   ', 'a.pdf')).toBeNull();
+  });
+});
+

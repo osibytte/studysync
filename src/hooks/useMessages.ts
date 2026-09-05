@@ -25,14 +25,18 @@ import type {
  * cards reflows three times on a slow connection. There is a second reason
  * here though, and it is the load-bearing one.
  *
- * Only `public.messages` is in the `supabase_realtime` publication (0014).
- * Sessions and materials are not, and could not usefully be: both are read
- * through SECURITY DEFINER RPCs that join in the proposer's name, the tally and
- * the threshold a card renders, and a replicated row carries none of that. So
- * the live edge is deliberately narrow — a message arrives, and when it is a
- * session or file message the hook refetches the lists behind it. A row that
- * changes with no message attached (somebody else answering a study time)
- * produces no event at all; that one is caught on the next focus.
+ * ONLY `public.messages` IS SUBSCRIBED TO HERE. `study_sessions` and `materials`
+ * are in the `supabase_realtime` publication too (0016, 0017), so subscribing to
+ * them is possible — it is just not useful. Both are read through SECURITY
+ * DEFINER RPCs that join in the proposer's name, the uploader's name, the tally
+ * and the threshold a card renders, and a replicated row carries none of that; a
+ * card built from the raw row would be missing most of its own text. So the live
+ * edge is deliberately narrow — a message arrives, and when it is a session or
+ * file message the hook refetches the lists behind it through those RPCs. A row
+ * that changes with no message attached (somebody else answering a study time,
+ * somebody removing a file) produces nothing this hook is listening for; that one
+ * is caught on the next focus, or by whichever screen made the change calling
+ * `refreshCards`.
  *
  * Nothing here replaces the transcript, everything merges into it by
  * `message_id` through upsertMessages: an optimistic bubble, that same INSERT
