@@ -8,9 +8,10 @@ Chat, materials and notifications are later stages. Stage 2's screens are writte
 
 ## What you need
 
-- Node.js 18 or newer
+- Node.js 20.19.4+, 22.13+, or 24.3+ — React Native 0.86 refuses older ones, Node 18 included
 - A free Supabase account and project
-- Expo Go on your phone
+- Expo Go on your phone (it runs one SDK version; this project is on **Expo SDK 57**, which is
+  what the current App Store and Play Store builds ship)
 - No card required at this tier
 
 ## Setup

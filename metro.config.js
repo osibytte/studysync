@@ -4,7 +4,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 /**
  * Metro config — one line, and the app does not bundle without it.
  *
- * Expo SDK 53 turned on Metro's `unstable_enablePackageExports` by default.
+ * Metro has had `unstable_enablePackageExports` on by default since Expo
+ * SDK 53, and still does on SDK 57.
  * With it on, Metro reads a package's `exports` map instead of `main`, and for
  * `@supabase/realtime-js` that resolves to the **Node** build — which does
  * `require('ws')`, and `ws` does `require('stream')`. React Native ships no
@@ -26,6 +27,11 @@ const { getDefaultConfig } = require('expo/metro-config');
  * Realtime matters here: the chat timeline subscribes to `postgres_changes`,
  * so the websocket client this pulls in is load-bearing, not dead weight that
  * could simply be excluded.
+ *
+ * Re-checked on the SDK 53 -> 57 upgrade by deleting the line and bundling:
+ * still the same 500 out of `ws/lib/stream.js`. Do not drop it without running
+ * that check again — `npm test` cannot see this, because jest-expo resolves
+ * through its own preset and never reads this file.
  */
 const config = getDefaultConfig(__dirname);
 
