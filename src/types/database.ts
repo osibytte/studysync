@@ -93,7 +93,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 // ===========================================================================
-// Stage 2 — Group Formation. Mirrors migrations 0004–0010. Kept in sync with
+// Stage 2 — Group Formation. Mirrors migrations 0004–0012. Kept in sync with
 // the SQL by hand (see the header note): change a migration, change this file.
 // ===========================================================================
 
@@ -222,6 +222,23 @@ export interface JoinRequestDetailRow {
   full_name: string | null;
   department: string | null;
   created_at: string;
+}
+
+/**
+ * Return row of `group_common_availability(p_group_id)` — the group's shared
+ * free time, plus the two numbers behind it (return shape widened in 0012).
+ *
+ * `common_mask` is a 28-character '0'/'1' string, character position = bit index
+ * (day * 4 + slot); read it with decodeAvailability(). `members_counted` is how
+ * many members were enrolled in the group's course, and `meet_threshold` how
+ * many of them had to be free for a slot to count — equal to the count below
+ * four members, a majority at four or more. Both come back so the screen can
+ * name the rule in force instead of assuming one.
+ */
+export interface GroupCommonAvailabilityRow {
+  common_mask: string;
+  members_counted: number;
+  meet_threshold: number;
 }
 
 /**

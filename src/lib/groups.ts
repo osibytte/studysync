@@ -2,6 +2,7 @@ import { makeActionId } from './ids';
 import { supabase } from './supabase';
 import type {
   DiscoverGroupRow,
+  GroupCommonAvailabilityRow,
   GroupMemberDetailRow,
   InvitationDetailRow,
   JoinRequestDetailRow,
@@ -11,7 +12,7 @@ import type {
 import type { FindGroupResponse } from '@/types/matching';
 
 /**
- * Typed wrappers over the Stage 2 group RPCs (migrations 0005, 0007, 0009, 0010)
+ * Typed wrappers over the Stage 2 group RPCs (migrations 0005, 0007, 0009–0012)
  * and the `find-group` Edge Function.
  *
  * WHY A WRAPPER LAYER. Three things would otherwise be repeated in every screen
@@ -29,9 +30,9 @@ import type { FindGroupResponse } from '@/types/matching';
  *      check `error` silently does nothing. These throw, so a caller's try/catch
  *      is the single path.
  *
- * Every function here is online-only by itself. Offline capability for the two
- * actions that have it (`group.create`, `group.leave`) lives in outbox.ts, which
- * calls back into these with the queued action's id.
+ * Every function here is online-only by itself. Offline capability for the three
+ * actions that have it (`group.create`, `group.leave`, `matching.pref`) lives in
+ * outbox.ts, which calls back into these with the queued action's id.
  */
 
 /** Thrown for a failed RPC. Screens map it with friendlyError(). */
@@ -198,14 +199,21 @@ export async function respondJoinRequest(
   );
 }
 
-/** Opt this course in or out of admin-initiated batch matching. */
+/**
+ * Opt this course in or out of admin-initiated batch matching.
+ *
+ * Takes an optional `clientActionId` for the same reason createGroup does: this
+ * is the third action the outbox can replay, so the queued id has to survive
+ * into the RPC or the replay would claim a fresh ledger row.
+ */
 export async function setMatchingPref(
   courseId: string,
-  pref: MatchingPref
+  pref: MatchingPref,
+  clientActionId?: string
 ): Promise<void> {
   unwrap(
     await supabase.rpc('set_matching_pref', {
-      p_client_action_id: makeActionId(),
+      p_client_action_id: clientActionId ?? makeActionId(),
       p_course_id: courseId,
       p_pref: pref,
     })
@@ -241,15 +249,26 @@ export async function groupMembersDetail(
 }
 
 /**
- * The group's majority-rule shared availability as a 28-char mask (0010).
+ * The group's shared availability, with the rule that produced it (0010, shape
+ * widened in 0012).
  *
- * An aggregate, not each member's grid — read it with decodeAvailability().
+ * An aggregate, not each member's grid — read `common_mask` with
+ * decodeAvailability(). `meet_threshold` is how many members had to be free for
+ * a slot to count: everyone below four members, a majority at four or more.
+ *
+ * A set-returning function, so PostgREST hands back an array of one row. A
+ * missing row (only possible if the read itself is empty) degrades to an empty
+ * mask counted over nobody, which the screen renders as "no availability yet"
+ * rather than as a claim about the group.
  */
-export async function groupCommonAvailabilityMask(groupId: string): Promise<string> {
+export async function groupCommonAvailability(
+  groupId: string
+): Promise<GroupCommonAvailabilityRow> {
   const data = unwrap(
     await supabase.rpc('group_common_availability', { p_group_id: groupId })
   );
-  return (data as string | null) ?? '';
+  const row = (data as GroupCommonAvailabilityRow[] | null)?.[0];
+  return row ?? { common_mask: '', members_counted: 0, meet_threshold: 0 };
 }
 
 /** Your pending invitations, with group, course and inviter resolved (0010). */

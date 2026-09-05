@@ -2,7 +2,7 @@
 
 Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
 
-This is the first two stages of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. They can then be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests. Profile edits, creating a group and leaving a group all work offline and sync when the connection returns.
+This is the first two stages of a five-stage build. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid. They can then be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests. Profile edits, creating a group, leaving a group, and choosing whether a course opts into automatic matching all work offline and sync when the connection returns.
 
 Chat, materials and notifications are later stages. Stage 2's screens are written and typechecked but have **not yet been exercised against the live database from a device** — see the end of the Stage 2 section.
 
@@ -131,7 +131,7 @@ If you see rows, RLS is not doing its job. Check that `0002_stage1_rls.sql` ran 
 
 ## Stage 2 — Group Formation
 
-The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). `0009` then removed topics, and `0010` added the four read RPCs the client screens need. Run them in order after Stage 1's `0001`–`0003`.
+The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). `0009` then removed topics, `0010` added the four read RPCs the client screens need, `0011` added the course-enrolment gate to the five write paths that hand out or promise a membership, and `0012` made the shared-time answer require every member while a group is small. Run them in order after Stage 1's `0001`–`0003`.
 
 The compatibility score is a weighted sum, normalised to `[0, 1]`:
 
@@ -182,7 +182,7 @@ Expect a JSON body with `requester`, a ranked `groups` array, and a ranked `sugg
 supabase functions deploy run-batch-matching --no-verify-jwt
 ```
 
-**Who's in the pool.** Every student enrolled in the course with `user_courses.matching_pref = 'system'` (the default on enrolment), minus anyone already in a group on that course. A student who would rather organise their own group sets `matching_pref = 'self_organized'` (through the `set_matching_pref` RPC in `0007`) and is left out — "the self-matching students are not among." So is anyone who has already self-organised, since group membership excludes them too.
+**Who's in the pool.** Every student enrolled in the course with `user_courses.matching_pref = 'system'` (the default on enrolment), minus anyone already in a group on that course. A student who would rather organise their own group sets `matching_pref = 'self_organized'` — from the "How you get matched" screen, which calls the `set_matching_pref` RPC in `0007` — and is left out: "the self-matching students are not among." So is anyone who has already self-organised, since group membership excludes them too.
 
 **How it groups.** Group size is a random target of 3–6, per the product decision. Two rules keep the tail humane: a remainder of 2–6 becomes one final group (a pair is allowed), and a target that would strand exactly one student is shrunk by one. So any pool of ≥ 2 is fully grouped, and only a lone student (a pool of exactly one) comes back in `waiting`, to be picked up on the next run. Each group is written through the `create_system_group` RPC (`0007`) — service-role-only, the sole write path, mirroring how the client's own mutations go through definer RPCs.
 
@@ -208,13 +208,19 @@ The response is a run summary: `pool_size`, the `groups` formed (each with its m
 
 ### The client screens
 
-`app/(app)/groups/` holds the Stage 2 UI: the list of your groups, create, browse (`discover`), matching (`match`), invitations, a group detail screen, and invite-a-student. `src/lib/groups.ts` is one typed wrapper per RPC; `src/lib/groupRules.ts` holds the status vocabulary, capacity phrasing and can-I-do-this predicates the screens share, unit-tested against the SQL rules they mirror.
+`app/(app)/groups/` holds the Stage 2 UI: the list of your groups, create, browse (`discover`), matching (`match`), invitations, how you get matched (`matching`), a group detail screen, and invite-a-student. `src/lib/groups.ts` is one typed wrapper per RPC; `src/lib/groupRules.ts` holds the status vocabulary, capacity phrasing and can-I-do-this predicates the screens share, unit-tested against the SQL rules they mirror.
+
+**"How you get matched" is per course, not per student**, because `matching_pref` is a column on `user_courses` (`0007`): a student may want placing on the course they are struggling with and left alone on the one where they already have friends. The setting changes what a *batch matching run* does and nothing else — suggestions, browsing, requests and invitations work identically either way, and the hints say so, because "opt out" otherwise reads as "opt out of study groups". The screen also mirrors the run's own pool exclusion (`inMatchingPool`), so a course you are opted in on but already grouped on says it will be passed over rather than quietly doing nothing.
 
 **Migration `0010` exists because of a name-resolution gap.** Stage 1's RLS on `users` is own-row only, which is the right default — a student must not be able to enumerate the student body. Stage 2's policies let a member read `group_members` (ids and roles) and their own invitations, but not the *names* behind those ids, so the roster and invitation screens had nothing to render. Widening the `users` policy would have fixed the screens and broken the privacy posture. Instead `0010` follows the precedent `search_students` already set: four SECURITY DEFINER `stable` reads, each gated on an explicit membership check, each returning **name and department only** — `group_members_detail`, `group_common_availability`, `my_invitations`, `group_join_requests`.
 
-**Only creating and leaving a group work offline.** Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting and matching are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id.
+**Migration `0011` closes an enrolment gap the client could not have caused.** `create_group`, `request_to_join` and `send_invitation` never checked that the course being acted on was one the student is actually enrolled in, so a student enrolled only in BIO 201 could create a group on CSC 201 and ask to join one — confirmed live before the fix. Every screen takes its course id from the student's own enrolments, so the app never reached those states, but the RPCs are the real boundary and the damage was not cosmetic: because the shared-time tally joins members to `user_courses` on the group's course, a member who was never enrolled was dropped from it altogether, so "when you can all meet" quietly answered for a subset of the roster while presenting itself as the whole group's answer. `0011` adds one `is_enrolled(user_id, course_id)` helper (SECURITY DEFINER, `stable`, revoked from `anon`) and calls it from the three paths that *insert* a membership — `create_group`, `respond_join_request`, `respond_invitation` — plus the two that *promise* one, `request_to_join` and `send_invitation`. Checking at the moment of insert as well as the moment of asking is deliberate: a student can drop the course between requesting and being approved. Declining an invitation or a request is never gated — refusing someone should not depend on your enrolments. `discover_groups` is left ungated on purpose, since browsing what exists on a course is how a student decides to enrol.
 
-**Still unverified:** no Stage 2 RPC has been called from a real device yet. `npm test` covers the pure rules and `npm run typecheck` is green, but the end-to-end walk — two accounts on one course, both pathways, then the offline cases — is the next thing to do. `HANDOFF.md` §7 has the script for it.
+**Migration `0012` makes "when you can all meet" mean *all* of you while a group is small.** `0010` marked a slot as shared when at least half the members were free then (`free >= ceil(n/2)`), which is right for a group of six — insisting on unanimity there usually returns nothing — and wrong for a group of two, where the threshold works out to 1 and the heading ends up describing a *union*. Measured live before the fix, with two members free at `1100110011001100110000000000` and `1100000011000000110011110000`, the group's grid came back `1100110011001100110011110000`: every slot either of them could make, presented as the time they can meet. Since every group begins at one or two members, that was the first thing most students would have read. `0012` sets the threshold to `n` at three members or fewer and keeps `ceil(n/2)` from four up. The step at four is deliberate rather than a smooth curve: two or three people can genuinely all show up, and a fourth is where holding out for unanimity starts costing the group more meetings than it saves. The RPC now returns `members_counted` and `meet_threshold` alongside the mask, and the screen names the rule it was given — "6 slots where all 2 of you are free" against "4 slots where at least 3 of 5 are free" — because the count the SQL divides by is the members enrolled in the *group's course*, which is smaller than the roster when someone has dropped it, so the client cannot re-derive the threshold from what it can see. The TypeScript `groupCommonAvailability` in `src/lib/availability.ts` deliberately did **not** change: it feeds the matching scorer, where an intersection would score most young groups 0 on schedule overlap and bury exactly the groups that need members. Both the migration header and the TS doc comment say so, so neither gets "fixed" into agreeing with the other.
+
+ Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting and matching are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id. `matching.pref` is safe on the opposite reasoning: it hands out no seat, nobody has to answer it, and it only takes effect the next time an operator runs batch matching — so a change that lands minutes later is honoured in full.
+
+**Verified against the live project, 2026-09-05.** Every Stage 2 RPC was driven with two throwaway accounts over PostgREST using real user JWTs — the same wire supabase-js uses, so argument names, return shapes, table grants and RLS were all under test. Both pathways end to end, the creator-only refusals, an idempotent replay of `create_group`, disband-on-empty, both hooks' embedded selects, and `find-group`'s first real caller all behaved as written. `0011` was then verified the same way: each of the five gates refused with its own message, a refused `create_group` left no `groups` row behind (the raise rolls the ledger claim back with it), approving a requester who had since dropped the course and accepting an invitation after dropping were both refused while *declining* still worked, and `anon` cannot call `is_enrolled` at all. `set_matching_pref` was checked for the property its offline queueing rests on — a replay under the same `p_client_action_id` is a no-op even with the opposite value, a fresh id applies, and an invalid preference raises without leaving a ledger row, so a retry is possible. `0012` was verified on a four-member group built one member at a time, with the member masks chosen so each threshold produces a different answer: at two members the mask is now the intersection `1100000011000000110000000000` where `0010` returned the union, three members requires all three, the fourth restores the majority (threshold 2), a member who drops the course stops being counted at all (`members_counted` 3 of a roster of 4, threshold 3), a group with no enrolled members returns an empty mask with both numbers 0, and `anon` gets `401` / `42501 permission denied for function` rather than a mask. All test rows and users were deleted afterwards. **Still unverified: the UI itself** — no Stage 2 screen has been touched by a finger, and the offline queue has not drained on a real phone. `HANDOFF.md` §7 has the walkthrough.
 
 ## Layout
 
@@ -224,8 +230,8 @@ app/                      expo-router routes
   (auth)/                 login, signup
   (onboarding)/           profile → courses → availability
   (app)/                  home, profile, courses
-    groups/               list, create, discover, match, invitations,
-                          [groupId]/ detail + invite
+    groups/               list, create, discover, match, matching,
+                          invitations, [groupId]/ detail + invite
 src/
   components/             Button, TextField, Screen, AvailabilityGrid,
                           OfflineBanner, CourseChips, StatusPill
@@ -247,7 +253,7 @@ src/
     database.ts           schema types (Stage 1 + Stage 2 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS + RPCs (0001–0010)
+  migrations/             schema + RLS + RPCs (0001–0012)
   seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts
@@ -282,9 +288,9 @@ Found during spec review; the feature logic requires them:
 
 Availability edits apply to every enrolled course at once. Intentional for now, per above.
 
-**`create_group` does not check that the creator is enrolled in the course.** The client only ever offers enrolled courses, and everything that fills a group afterwards is course-scoped — `discover_groups` lists it to that course's students, `search_students` only finds them, matching only scores them — so the practical result of getting past the UI would be a group nobody can find. Closing it in SQL means a forward-only `0011`; worth doing before Stage 3.
+**The matching scorer and the group screen answer "when is this group free" differently, on purpose.** `groupCommonAvailability` in TypeScript stays on a plain majority at every size, while `0012`'s SQL requires everyone below four members. Both places carry a comment saying so, and every rule they share is unit-tested — but two functions with the same name and different answers is the kind of thing a future reader will want to tidy up, and tidying it up either scores young groups 0 on schedule overlap or puts a union back behind "when you can all meet". Worth a shared name change before Stage 3 rather than a rule change.
 
-**`set_matching_pref` has no screen.** The RPC (`0007`) and its wrapper exist, so a student cannot yet opt out of system batch matching from the app.
+**Closed since the first draft of this file:** the enrolment gap in the write RPCs (`0011`), the shared-time rule that called two people a majority of two (`0012`), and the missing `set_matching_pref` screen (`app/(app)/groups/matching.tsx`) — all three described in the Stage 2 section.
 
 ## Before Stage 3
 

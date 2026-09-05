@@ -2,6 +2,7 @@ import type {
   GroupMemberDetailRow,
   GroupRole,
   GroupStatus,
+  MatchingPref,
   MyGroupRow,
 } from '@/types/database';
 
@@ -164,4 +165,82 @@ export function defaultGroupName(courseCode: string | null | undefined): string 
 export function scorePercent(score: number): number {
   if (!Number.isFinite(score)) return 0;
   return Math.round(Math.min(1, Math.max(0, score)) * 100);
+}
+
+// ---------------------------------------------------------------------------
+// "When you can all meet" (group_common_availability, migrations 0010 + 0012)
+// ---------------------------------------------------------------------------
+
+/**
+ * How the group's shared grid was computed, in words.
+ *
+ * `group_common_availability` marks a slot when `free >= meet_threshold`, and
+ * since 0012 that threshold is the member count below four members and a
+ * majority at four or more. The caption has to say which, because "3 slots
+ * work" means something different under each — and the client must not
+ * re-derive the rule from the roster length: the RPC counts members enrolled in
+ * the group's COURSE, which is a smaller number for a member who has since
+ * dropped it. Both numbers come back from the RPC for exactly that reason.
+ *
+ * Returns the phrase alone (no leading count) so the caller controls the
+ * sentence: "3 slots where all 3 of you are free."
+ */
+export function meetRuleLabel(membersCounted: number, meetThreshold: number): string {
+  if (membersCounted <= 0) return 'where the group is free';
+  if (meetThreshold >= membersCounted) {
+    return membersCounted === 1
+      ? 'where you are free'
+      : `where all ${membersCounted} of you are free`;
+  }
+  return `where at least ${meetThreshold} of ${membersCounted} are free`;
+}
+
+/**
+ * Whether a slot needs EVERY counted member free, i.e. the group is small
+ * enough that "when you can all meet" is literal. Drives the empty-state
+ * wording, which otherwise promises an answer the rule cannot give.
+ */
+export function requiresEveryone(
+  membersCounted: number,
+  meetThreshold: number
+): boolean {
+  return membersCounted > 0 && meetThreshold >= membersCounted;
+}
+
+// ---------------------------------------------------------------------------
+// How you get matched (user_courses.matching_pref, migration 0007)
+// ---------------------------------------------------------------------------
+
+/**
+ * The two preferences, in the student's words rather than the column's.
+ *
+ * 'system' is the column default, so every new enrolment starts opted in; the
+ * labels are written to make that the unremarkable choice it is.
+ */
+export const MATCHING_PREF_LABEL: Record<MatchingPref, string> = {
+  system: 'Match me automatically',
+  self_organized: 'I will find my own group',
+};
+
+export const MATCHING_PREF_HINT: Record<MatchingPref, string> = {
+  system:
+    'When a coordinator runs matching for this course, you can be placed in a group with students whose free time lines up with yours.',
+  self_organized:
+    'You will never be placed automatically. Suggestions, browsing, requests and invitations all still work exactly the same.',
+};
+
+/**
+ * Whether a batch run would actually consider this enrolment.
+ *
+ * Mirrors run-batch-matching's pool: `matching_pref = 'system'` MINUS anyone
+ * already in a group on the course — any group, whatever its status, which is
+ * why the group need not be live for this to return false. Being opted in but
+ * already grouped is not a mistake to correct, so the screen explains it instead
+ * of hiding the setting.
+ */
+export function inMatchingPool(
+  pref: MatchingPref,
+  isGroupedOnCourse: boolean
+): boolean {
+  return pref === 'system' && !isGroupedOnCourse;
 }

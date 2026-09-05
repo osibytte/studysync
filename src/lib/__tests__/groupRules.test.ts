@@ -1,5 +1,7 @@
 import {
   JOINABLE_STATUSES,
+  MATCHING_PREF_HINT,
+  MATCHING_PREF_LABEL,
   STATUS_HINT,
   STATUS_LABEL,
   canInvite,
@@ -7,11 +9,14 @@ import {
   capacityLabel,
   defaultGroupName,
   displayName,
+  inMatchingPool,
   isCreator,
   isFull,
   isJoinable,
   isLive,
+  meetRuleLabel,
   memberLine,
+  requiresEveryone,
   scorePercent,
   seatsLeft,
   sortMyGroups,
@@ -19,6 +24,7 @@ import {
 import type {
   GroupMemberDetailRow,
   GroupStatus,
+  MatchingPref,
   MyGroupRow,
 } from '@/types/database';
 
@@ -300,5 +306,91 @@ describe('scorePercent', () => {
     // A zero divisor upstream should degrade the badge, not crash the card.
     expect(scorePercent(Number.NaN)).toBe(0);
     expect(scorePercent(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+
+describe('matching preference', () => {
+  const PREFS: MatchingPref[] = ['system', 'self_organized'];
+
+  it('labels and explains both preferences', () => {
+    for (const pref of PREFS) {
+      expect(MATCHING_PREF_LABEL[pref].length).toBeGreaterThan(0);
+      expect(MATCHING_PREF_HINT[pref].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('never describes opting out as losing the rest of group formation', () => {
+    // The hint is the only place the app explains the choice, and a student who
+    // reads "you will not be matched" as "you cannot join groups" opts out of
+    // the product rather than the batch run.
+    expect(MATCHING_PREF_HINT.self_organized).toMatch(/invitation|request|brows/i);
+  });
+
+  it('pools an opted-in student who is not grouped on the course', () => {
+    expect(inMatchingPool('system', false)).toBe(true);
+  });
+
+  it('excludes an opted-in student already grouped on the course', () => {
+    // run-batch-matching subtracts existing members from the pool, so an opted-in
+    // student who already has a group is skipped rather than placed twice.
+    expect(inMatchingPool('system', true)).toBe(false);
+  });
+
+  it('excludes a self-organizing student either way', () => {
+    expect(inMatchingPool('self_organized', false)).toBe(false);
+    expect(inMatchingPool('self_organized', true)).toBe(false);
+  });
+});
+
+/**
+ * The shared-time rule, as the caption states it.
+ *
+ * The threshold itself lives in SQL (`group_common_availability`, 0012) and is
+ * returned with the mask, so these tests are not a second copy of the rule —
+ * they pin that the caption never describes a threshold the RPC did not apply.
+ * Reading "3 slots where all 4 of you are free" off a majority mask is the exact
+ * mistake that makes a student turn up to an empty room.
+ */
+describe('meetRuleLabel', () => {
+  it('says "all of you" when everyone is required', () => {
+    // n <= 3 in 0012: threshold equals the count.
+    expect(meetRuleLabel(2, 2)).toBe('where all 2 of you are free');
+    expect(meetRuleLabel(3, 3)).toBe('where all 3 of you are free');
+  });
+
+  it('names both numbers when a majority is enough', () => {
+    expect(meetRuleLabel(4, 2)).toBe('where at least 2 of 4 are free');
+    expect(meetRuleLabel(5, 3)).toBe('where at least 3 of 5 are free');
+  });
+
+  it('does not say "all 1 of you" to a lone member', () => {
+    expect(meetRuleLabel(1, 1)).toBe('where you are free');
+  });
+
+  it('claims nothing when nobody was counted', () => {
+    // members_counted is 0 when no member has a user_courses row for the
+    // course; the mask is empty and the caption must not imply a group answer.
+    expect(meetRuleLabel(0, 0)).toBe('where the group is free');
+  });
+
+  it('never describes a threshold above the count as a partial rule', () => {
+    // Defensive: a threshold that exceeds the count could only come from a bug,
+    // and "at least 4 of 3" is worse than rounding it to "all of you".
+    expect(meetRuleLabel(3, 4)).toBe('where all 3 of you are free');
+  });
+});
+
+describe('requiresEveryone', () => {
+  it('is true exactly when the threshold takes in the whole group', () => {
+    expect(requiresEveryone(2, 2)).toBe(true);
+    expect(requiresEveryone(3, 3)).toBe(true);
+    expect(requiresEveryone(4, 2)).toBe(false);
+    expect(requiresEveryone(6, 3)).toBe(false);
+  });
+
+  it('is false with nobody counted', () => {
+    // Drives which empty state shows: "no availability on file" rather than
+    // "no slot works for all 0 of you".
+    expect(requiresEveryone(0, 0)).toBe(false);
   });
 });

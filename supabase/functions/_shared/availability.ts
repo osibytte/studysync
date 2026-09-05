@@ -190,6 +190,14 @@ export function scheduleOverlapScore(a: AvailabilityGrid, b: AvailabilityGrid): 
  *   * A one-member group reduces to exactly that member's own grid (ceil(1/2)=1),
  *     which is what a lone-student "form a new group" candidate should score as.
  *
+ * NOT the same rule as the group detail screen's "when you can all meet", which
+ * since migration 0012 requires EVERY member while the group is under four. That
+ * heading answers "when do we meet" and has an exact answer for two people; this
+ * function answers "how well would a newcomer fit here", and an intersection
+ * would score most young groups 0 on schedule overlap — burying the groups that
+ * most need members. The divergence is deliberate; change this one only for a
+ * scoring reason, and change `group_common_availability` (0012) for a display one.
+ *
  * Returns an empty grid for no members, keeping the scorer's divisor non-zero.
  */
 export function groupCommonAvailability(grids: AvailabilityGrid[]): AvailabilityGrid {

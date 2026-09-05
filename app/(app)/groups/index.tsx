@@ -143,6 +143,13 @@ export default function GroupsScreen() {
           style={styles.spaced}
         />
         <Button
+          label="How you get matched"
+          variant="ghost"
+          onPress={() => router.push('/(app)/groups/matching')}
+          style={styles.spaced}
+          accessibilityHint="Choose per course whether a coordinator can place you in a group"
+        />
+        <Button
           label="Back to home"
           variant="ghost"
           onPress={() => router.push('/(app)/home')}

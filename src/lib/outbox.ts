@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createGroup, leaveGroup } from './groups';
+import { createGroup, leaveGroup, setMatchingPref } from './groups';
 import { makeActionId } from './ids';
 import { supabase, isNetworkError } from './supabase';
+import type { MatchingPref } from '@/types/database';
 
 /**
  * Offline write queue.
@@ -43,12 +44,17 @@ const DEAD_KEY = 'studysync:outbox:dead:v1';
 /**
  * Actions the queue knows how to replay. Extended as later stages land.
  *
- * Stage 2 adds only the two group actions that are useful offline: creating a
- * group and leaving one. The rest (invite, respond, approve) are deliberately
- * online-only — each one depends on server state that may have changed while
- * the device was offline (a group filling up, an invitation being cancelled),
- * so queueing them would mostly produce dead-lettered actions and a confusing
- * optimistic UI.
+ * Stage 2 adds only the three group actions that are useful offline: creating a
+ * group, leaving one, and changing how you want to be matched on a course. The
+ * rest (invite, respond, approve) are deliberately online-only — each one
+ * depends on server state that may have changed while the device was offline (a
+ * group filling up, an invitation being cancelled), so queueing them would
+ * mostly produce dead-lettered actions and a confusing optimistic UI.
+ *
+ * `matching.pref` is queueable on the opposite reasoning: it hands out no seat
+ * and nobody else has to answer it. It is a private, last-write-wins setting
+ * that only takes effect the next time an admin runs batch matching, so landing
+ * it minutes later is honoured exactly as if it had landed at once.
  */
 export type OutboxActionType =
   | 'profile.update'
@@ -56,7 +62,8 @@ export type OutboxActionType =
   | 'course.remove'
   | 'availability.set'
   | 'group.create'
-  | 'group.leave';
+  | 'group.leave'
+  | 'matching.pref';
 
 export interface OutboxAction {
   /** uuid — doubles as the server-side idempotency key. */
@@ -178,7 +185,11 @@ function isDuplicateKey(error: unknown): boolean {
  * transaction (which is strictly better: the claim and the write commit or roll
  * back together).
  */
-const SELF_LEDGERED: readonly OutboxActionType[] = ['group.create', 'group.leave'];
+const SELF_LEDGERED: readonly OutboxActionType[] = [
+  'group.create',
+  'group.leave',
+  'matching.pref',
+];
 
 /**
  * Record the action id server-side, then run the write.
@@ -289,6 +300,20 @@ async function applyAction(action: OutboxAction): Promise<void> {
     case 'group.leave': {
       const { group_id } = action.payload as { group_id: string };
       await leaveGroup(group_id, action.id);
+      return;
+    }
+
+    /**
+     * Last-write-wins. If two pref changes for the same course are queued, FIFO
+     * means the later one is applied last, which is the answer the student left
+     * the screen with.
+     */
+    case 'matching.pref': {
+      const { course_id, pref } = action.payload as {
+        course_id: string;
+        pref: MatchingPref;
+      };
+      await setMatchingPref(course_id, pref, action.id);
       return;
     }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CacheKeys, cacheReadData, cacheWrite } from '@/lib/cache';
 import {
-  groupCommonAvailabilityMask,
+  groupCommonAvailability,
   groupJoinRequests,
   groupMembersDetail,
 } from '@/lib/groups';
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   Course,
   Group,
+  GroupCommonAvailabilityRow,
   GroupMemberDetailRow,
   GroupRole,
   JoinRequestDetailRow,
@@ -18,9 +19,9 @@ import type {
  * Everything the group detail screen renders, in one hook.
  *
  * Four sources, fetched together: the group row (readable to a member under the
- * 0005 policy), the roster with names, the majority-rule availability mask, and
- * pending join requests — the last three via the 0010 SECURITY DEFINER reads,
- * which exist because RLS on public.users is own-row only.
+ * 0005 policy), the roster with names, the shared availability mask and the rule
+ * behind it, and pending join requests — the last three via the 0010 SECURITY
+ * DEFINER reads, which exist because RLS on public.users is own-row only.
  *
  * Bundled rather than four hooks so the screen has one loading state and one
  * cache entry: a detail screen that renders its roster, then its availability,
@@ -33,8 +34,8 @@ import type {
 export interface GroupDetail {
   group: (Group & { course: Course | null }) | null;
   members: GroupMemberDetailRow[];
-  /** 28-char '0'/'1' mask. Read it with decodeAvailability(). */
-  commonMask: string;
+  /** Shared free time, with the member count and threshold behind it (0012). */
+  common: GroupCommonAvailabilityRow;
   joinRequests: JoinRequestDetailRow[];
 }
 
@@ -46,10 +47,16 @@ interface State extends GroupDetail {
   reload: () => Promise<void>;
 }
 
+const NO_COMMON: GroupCommonAvailabilityRow = {
+  common_mask: '',
+  members_counted: 0,
+  meet_threshold: 0,
+};
+
 const EMPTY: GroupDetail = {
   group: null,
   members: [],
-  commonMask: '',
+  common: NO_COMMON,
   joinRequests: [],
 };
 
@@ -72,12 +79,15 @@ export function useGroupDetail(
     const cacheKey = CacheKeys.groupDetail(userId, groupId);
     const cached = await cacheReadData<GroupDetail>(cacheKey);
     if (cached) {
-      setDetail(cached);
+      // `common` replaced a bare `commonMask` string in 0012. An entry written
+      // by an older build has no `common` key, and rendering `undefined.mask`
+      // would crash the screen it is meant to keep working offline.
+      setDetail({ ...cached, common: cached.common ?? NO_COMMON });
       setLoading(false);
     }
 
     try {
-      const [groupResult, members, commonMask, joinRequests] = await Promise.all([
+      const [groupResult, members, common, joinRequests] = await Promise.all([
         supabase
           .from('groups')
           .select(
@@ -104,7 +114,7 @@ export function useGroupDetail(
           .eq('group_id', groupId)
           .maybeSingle(),
         groupMembersDetail(groupId),
-        groupCommonAvailabilityMask(groupId),
+        groupCommonAvailability(groupId),
         groupJoinRequests(groupId),
       ]);
 
@@ -113,7 +123,7 @@ export function useGroupDetail(
       const next: GroupDetail = {
         group: (groupResult.data as GroupDetail['group']) ?? null,
         members,
-        commonMask,
+        common,
         joinRequests,
       };
       setDetail(next);

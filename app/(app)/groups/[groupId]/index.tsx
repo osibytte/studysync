@@ -17,7 +17,9 @@ import {
   displayName,
   isCreator,
   isLive,
+  meetRuleLabel,
   memberLine,
+  requiresEveryone,
   seatsLeft,
 } from '@/lib/groupRules';
 import {
@@ -53,7 +55,7 @@ export default function GroupDetailScreen() {
   const {
     group,
     members,
-    commonMask,
+    common,
     joinRequests,
     role,
     loading,
@@ -156,8 +158,13 @@ export default function GroupDetailScreen() {
     }
   }
 
-  const commonGrid = decodeAvailability(commonMask);
+  const commonGrid = decodeAvailability(common.common_mask);
   const commonCount = countSelected(commonGrid);
+  const meetRule = meetRuleLabel(common.members_counted, common.meet_threshold);
+  const everyoneNeeded = requiresEveryone(
+    common.members_counted,
+    common.meet_threshold
+  );
   const memberCount = members.length > 0 ? members.length : 1;
   const creator = isCreator(role);
   const live = !!group && isLive(group.status);
@@ -244,18 +251,27 @@ export default function GroupDetailScreen() {
         </Text>
       )}
 
-      <Text style={styles.sectionHeader}>When you can all meet</Text>
-      {commonCount === 0 ? (
+      <Text style={styles.sectionHeader}>
+        {everyoneNeeded ? 'When you can all meet' : 'When most of you can meet'}
+      </Text>
+      {common.members_counted === 0 ? (
         <Text style={styles.emptyText}>
-          No slot works for at least half the group yet. Anyone who has not filled
-          in their availability is holding this back.
+          No availability on file for this course yet, so there is nothing to
+          compare. Set yours in Courses and it appears here.
+        </Text>
+      ) : commonCount === 0 ? (
+        <Text style={styles.emptyText}>
+          No slot works {meetRule} yet. Anyone who has not filled in their
+          availability is holding this back.
         </Text>
       ) : (
         <>
           <Text style={styles.body}>{describeSelection(commonGrid, 6)}</Text>
           <Text style={styles.bodyMuted}>
-            {commonCount} slot{commonCount === 1 ? '' : 's'} where at least half the
-            group is free.
+            {commonCount} slot{commonCount === 1 ? '' : 's'} {meetRule}.
+            {everyoneNeeded
+              ? ''
+              : ' Below four members every slot needs everyone; above it, a majority.'}
           </Text>
         </>
       )}
