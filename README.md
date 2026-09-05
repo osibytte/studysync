@@ -37,7 +37,7 @@ Supabase dashboard → SQL Editor → New query. Run every file **in numerical o
 2. `supabase/migrations/0002_stage1_rls.sql` — row level security policies
 3. `supabase/seed/0003_seed_courses.sql` — placeholder courses
 
-…then `0004` through `0018` from `supabase/migrations/`. The seed took the number `0003`, so the migrations skip it; nothing is missing.
+…then `0004` through `0019` from `supabase/migrations/`. The seed took the number `0003`, so the migrations skip it; nothing is missing.
 
 Order matters throughout, and migrations are **forward-only** — an applied file is never edited, which is why a few of them still carry comments naming things a later one dropped or renamed. `0002` adds policies to tables `0001` creates and the seed inserts into them; `0005` adds policies to `0004`'s tables; `0018` fixes a gap in `0017`'s Storage policies. Filenames record when a file was written rather than which stage owns it, so `0017_stage3_materials.sql` and `0018_stage3_storage_readback.sql` are in fact Stage 4's backend.
 
@@ -73,7 +73,7 @@ Scan the QR with Expo Go. If you change `.env`, restart with `npx expo start --c
 npm test
 ```
 
-405 tests in 8 suites. The availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names), profile validation, the compatibility scorer, the group vocabulary, the chat and materials rules, and the notification rules. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
+432 tests in 8 suites. The availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names), profile validation, the compatibility scorer, the group vocabulary, the chat and materials rules, and the notification rules. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
 
 **A green suite cannot see a bundling failure**, because `jest-expo` resolves modules through its own preset and never reads `metro.config.js` — which is how this project once had 325 passing tests and an app that would not bundle on either platform. `HANDOFF.md` §4 has the four-part health check, including how to ask Metro for each platform's bundle directly.
 
@@ -251,11 +251,13 @@ Files are shared from the timeline, so a lecture slide arrives in the conversati
 
 Half of this stage is built and needs no development build; the other half needs one. The split is not arbitrary — it is the local/remote line described under [Before the pilot](#before-the-pilot).
 
-**Built: the 30-minute alarm.** When a group confirms a study time, this phone asks the OS to wake it 30 minutes before the start. Because the OS holds the schedule, the alert arrives with no signal, with the app force-closed, and after a reboot. `src/lib/notificationRules.ts` decides which alarms are owed (a pure module, 80 tests), `src/lib/notifier.ts` is the only file allowed to talk to `expo-notifications`, and `src/lib/reminders.ts` reconciles the two — re-running whenever the app comes to the foreground, comes online, or finishes draining its outbox, so cancelling a session clears its alarm.
+**Built: the 30-minute alarm.** When a group confirms a study time, this phone asks the OS to wake it 30 minutes before the start. Because the OS holds the schedule, the alert arrives with no signal, with the app force-closed, and after a reboot. `src/lib/notificationRules.ts` decides which alarms are owed (a pure module, 104 tests), `src/lib/notifier.ts` is the only file allowed to talk to `expo-notifications`, and `src/lib/reminders.ts` reconciles the two — re-running whenever the app comes to the foreground, comes online, or finishes draining its outbox, so cancelling a session clears its alarm.
 
 The rule most likely to look like a bug: **a session must start at least 31 minutes from now to get an alarm** (a 30-minute lead plus a 60-second floor). Propose something 20 minutes out and nothing is scheduled, by design. And the permission prompt appears at exactly one moment — the tap that answers *yes* to a study time — because that is the one point where a student has just said they intend to be somewhere.
 
-**Not built yet:** the notification ledger and its RLS, a preferences screen and in-app inbox, and remote push for chat, file and invitation activity. That last piece is what the EAS development build is for.
+**Built, and the reason the sender is safe to run twice:** `0019_stage5_notifications.sql`, the delivery ledger. It stores a row per thing a student was *told*, not per thing that happened, because you cannot enforce the `daily_cap` they set without counting deliveries — and "have we already said this?" is not answerable from the messages, files and sessions themselves. A unique `(user_id, dedupe_key)` index turns a retried or double-invoked run into a conflict the writer swallows instead of a second banner, and bucketing a period into that key is also how "at most once per fortnight" works with no cooldown table anywhere. Chat is watermarked rather than row-per-message: one digest row per group per run ("4 new messages in BIO 201"), so the table grows with how often the sender runs and not with how chatty a group is. The 30-minute alarm writes nothing here, deliberately — a phone in airplane mode could not, which is the whole point of it being local.
+
+**Not built yet:** a preferences screen and in-app inbox over that ledger, then remote push for chat, file, session and invitation activity — plus the four study nudges (a study time one yes short, a slot the whole group is free, a group gone quiet, an invitation never answered). Every one of those is capped, quiet-hours-silenced and individually switchable, and **none is ever urgent**: a nudge that ignores a student's stated limit is how notifications get switched off at the OS level, taking the study alarm they actually wanted with them. The remote half is what the EAS development build is for.
 
 ## Layout
 
@@ -301,7 +303,7 @@ src/
     database.ts           schema types (Stages 1–4 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS + RPCs (0001–0018; no 0003, that is the seed)
+  migrations/             schema + RLS + RPCs (0001–0019; no 0003, that is the seed)
   seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts

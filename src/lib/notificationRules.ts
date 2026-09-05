@@ -1,5 +1,9 @@
 import { formatClock, formatDuration, sessionWhenLabel } from '@/lib/chatRules';
-import type { GroupSessionRow, NotificationPrefs } from '@/types/database';
+import type {
+  GroupSessionRow,
+  NotificationKind,
+  NotificationPrefs,
+} from '@/types/database';
 
 /**
  * Pure rules for Stage 5 — what to tell a student, and when not to.
@@ -33,25 +37,22 @@ import type { GroupSessionRow, NotificationPrefs } from '@/types/database';
 // ---------------------------------------------------------------------------
 
 /**
- * Exactly what the owner asked for, and nothing proposed.
+ * The kinds, and the four tables every one of them must appear in.
+ *
+ * `NotificationKind` itself lives in `@/types/database` beside the `notifications`
+ * row shape it constrains, because `0019`'s check constraint is the other half of
+ * the same fact — the same "change one, change both" the availability bitmask has
+ * carried since Stage 1. Everything about what a kind *means* is here.
  *
  * Scope, verbatim: "push notification for chat activites (messages, meeting
  * schedule, files), phone alarm notification when its 30mins to study time".
- * Invitations are here too because being invited is unusable if nobody tells
- * you. The four *nudges* sketched in HANDOFF §8 (a session one yes short, a
- * free slot the group shares, a group gone quiet, an unanswered invitation) are
- * deliberately absent until they are chosen — this is a union, so adding one
- * later breaks every `Record<NotificationKind, …>` below until it is handled,
- * which is the point.
+ * Invitations are included because being invited is unusable if nobody tells you.
+ * The last four are the nudges, added 2026-09-05 once the owner chose them for
+ * "whatever notification is smart to indulge students to study" — all four of the
+ * four proposed in HANDOFF §8. They are a union member each, so adding one broke
+ * every `Record<NotificationKind, …>` below until it was answered for, which is
+ * exactly why it was written that way.
  */
-export type NotificationKind =
-  | 'session_reminder'
-  | 'session_proposed'
-  | 'session_confirmed'
-  | 'session_cancelled'
-  | 'message_activity'
-  | 'file_shared'
-  | 'invitation';
 
 /** Wording for the prefs screen's per-kind switches (step 5). */
 export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
@@ -62,6 +63,10 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   message_activity: 'New messages',
   file_shared: 'Shared files',
   invitation: 'Group invitations',
+  session_needs_one_yes: 'Study times needing one more yes',
+  group_free_slot: 'When your group is all free',
+  group_quiet: 'When a group goes quiet',
+  invitation_unanswered: 'Reminders about invitations you have not answered',
 };
 
 /**
@@ -75,6 +80,14 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
  * not happening. Everything else can wait for tomorrow's allowance; a student
  * who has already had three notifications today does not need a fourth to know
  * a file was shared.
+ *
+ * **No nudge is ever urgent, and this is the line that protects the alarm.** A
+ * nudge that ignores the cap is how a student comes to switch notifications off
+ * at the OS level, and the 30-minute reminder they actually asked for dies with
+ * them. `session_needs_one_yes` is the tempting one — it is time-limited and
+ * genuinely useful — and it is still false: a proposal that expires costs a
+ * meeting that was never agreed, which is not the same as being somewhere at the
+ * wrong time.
  */
 export const NOTIFICATION_URGENT: Record<NotificationKind, boolean> = {
   session_reminder: true,
@@ -84,6 +97,10 @@ export const NOTIFICATION_URGENT: Record<NotificationKind, boolean> = {
   message_activity: false,
   file_shared: false,
   invitation: false,
+  session_needs_one_yes: false,
+  group_free_slot: false,
+  group_quiet: false,
+  invitation_unanswered: false,
 };
 
 /**
@@ -92,7 +109,14 @@ export const NOTIFICATION_URGENT: Record<NotificationKind, boolean> = {
  * Only the reminder is local, and it is local for the reason in the header: it
  * has to fire offline. Note what this table implies for the sender — it must
  * never push a `session_reminder`, or a student with a signal gets the alarm
- * twice and one of them at the wrong second.
+ * twice and one of them at the wrong second. `0019`'s check constraint enforces
+ * the same rule at the database, where it becomes a failed insert instead of a
+ * duplicate alert.
+ *
+ * Every nudge is remote. Each one needs a question answered that this phone
+ * cannot answer alone: whether anybody else has said yes, what the whole group's
+ * shared availability is, whether a group has been quiet, whether an invitation
+ * was ever replied to.
  */
 export const NOTIFICATION_LOCAL: Record<NotificationKind, boolean> = {
   session_reminder: true,
@@ -102,6 +126,56 @@ export const NOTIFICATION_LOCAL: Record<NotificationKind, boolean> = {
   message_activity: false,
   file_shared: false,
   invitation: false,
+  session_needs_one_yes: false,
+  group_free_slot: false,
+  group_quiet: false,
+  invitation_unanswered: false,
+};
+
+/**
+ * How long a kind must stay silent about the same subject — the cooldown half of
+ * the dedupe key.
+ *
+ * `0019` has no cooldown table, on purpose: the unique `(user_id, dedupe_key)`
+ * index already refuses a second insert, so bucketing a period into the key makes
+ * "at most once per fortnight" a collision rather than a scheduled job's
+ * responsibility. This table says which period each kind buckets by, and
+ * `cooldownBucket` below turns that into the string.
+ *
+ *  - `'none'` — the subject itself is the limit. A session is proposed once,
+ *    confirmed once, cancelled once; a file is shared once; an invitation is
+ *    extended once and chased once. Keying on the id is the whole rule.
+ *  - `'run'` — the caller supplies the bucket, because it is data rather than a
+ *    clock reading: `message_activity` buckets by the watermark the run read
+ *    (`group_members.last_pushed_at`), which is what lets the next run through
+ *    while a retry of this one collides.
+ *  - `'week'` — a free-slot nudge, because `user_courses.availability` is a
+ *    **weekly** 7x4 mask: the same slot is free again next Tuesday, and telling a
+ *    group about it once a week is a suggestion where once a day is nagging.
+ *  - `'fortnight'` — the quiet-group nudge. A group that has gone quiet is
+ *    usually quiet for a reason, and the second reminder inside a week is the one
+ *    that gets notifications switched off rather than the group revived.
+ *
+ * Nothing here is `'day'`, and the omission is the `daily_cap` argument again: a
+ * nudge that can recur daily will, on some student's phone, be all three of their
+ * three daily notifications.
+ */
+export type NotificationCooldown = 'none' | 'run' | 'week' | 'fortnight';
+
+export const NOTIFICATION_COOLDOWN: Record<NotificationKind, NotificationCooldown> = {
+  // Scheduled on the device and deduped by `reminderId`, so it never reaches a
+  // dedupe key at all. 'none' is the honest answer rather than a special case.
+  session_reminder: 'none',
+  session_proposed: 'none',
+  session_confirmed: 'none',
+  session_cancelled: 'none',
+  message_activity: 'run',
+  file_shared: 'none',
+  invitation: 'none',
+  session_needs_one_yes: 'none',
+  group_free_slot: 'week',
+  group_quiet: 'fortnight',
+  invitation_unanswered: 'none',
 };
 
 // ---------------------------------------------------------------------------
@@ -405,7 +479,30 @@ export type NotificationSubject =
   | { kind: 'session_cancelled'; groupName: string; startsAt: string; durationMin: number }
   | { kind: 'message_activity'; groupName: string; count: number; senderNames: string[] }
   | { kind: 'file_shared'; groupName: string; sharerName: string; fileName: string }
-  | { kind: 'invitation'; groupName: string; inviterName: string };
+  | { kind: 'invitation'; groupName: string; inviterName: string }
+  // ---- The four nudges. Every one names an action, because a notification a
+  // student cannot act on is the one they turn off.
+  | {
+      kind: 'session_needs_one_yes';
+      groupName: string;
+      startsAt: string;
+      durationMin: number;
+    }
+  | {
+      kind: 'group_free_slot';
+      groupName: string;
+      /**
+       * "tomorrow 4-6pm" — already words, not a bitmask. The sender turns
+       * `group_common_availability`'s mask into this, because the mask means
+       * nothing without knowing the 7x4 slot layout and that knowledge belongs
+       * with `availability.ts`, not in a banner.
+       */
+      slotLabel: string;
+      /** How many OTHER members share the slot. 0 is possible and handled. */
+      othersFree: number;
+    }
+  | { kind: 'group_quiet'; groupName: string; quietDays: number }
+  | { kind: 'invitation_unanswered'; groupName: string; inviterName: string };
 
 /** A group with no name should be impossible; a banner reading "undefined" is worse. */
 function groupLabel(groupName: string): string {
@@ -508,6 +605,53 @@ export function notificationContent(
       return {
         title: `Invitation to ${group}`,
         body: `${personLabel(subject.inviterName)} invited you to join.`,
+      };
+
+    // ---- The nudges ------------------------------------------------------
+    // Each body ends in the action, and each names the thing it is about, so a
+    // student reading a lock screen knows what they would be agreeing to before
+    // they unlock. None of them says what another student is doing right now —
+    // that privacy line has held since 0010, where every read returns a name and
+    // a department and never a raw availability mask.
+
+    case 'session_needs_one_yes':
+      return {
+        title: `One more yes needed`,
+        body: `${group} · ${sessionWhenLabel(
+          subject.startsAt,
+          subject.durationMin,
+          now
+        )} is one yes from confirmed.`,
+      };
+
+    case 'group_free_slot': {
+      const slot = (subject.slotLabel ?? '').trim();
+      const others = Math.max(0, Math.round(subject.othersFree));
+      // "You and 2 others", "You and 1 other", or just "You" — a group of one is
+      // real (0006 disbands on empty, not on one), and "You and 0 others are
+      // free" is the kind of sentence that makes an app look unfinished.
+      const who =
+        others === 0 ? 'You are' : others === 1 ? 'You and 1 other are' : `You and ${others} others are`;
+      return {
+        title: `${group} is free${slot ? ` ${slot}` : ''}`,
+        body: slot
+          ? `${who} free ${slot}. Propose a study time?`
+          : `${who} free at the same time. Propose a study time?`,
+      };
+    }
+
+    case 'group_quiet': {
+      const days = Math.max(1, Math.round(subject.quietDays));
+      return {
+        title: `${group} has gone quiet`,
+        body: `Nothing here for ${days === 1 ? 'a day' : `${days} days`}. Send a message or propose a study time.`,
+      };
+    }
+
+    case 'invitation_unanswered':
+      return {
+        title: `Still deciding on ${group}?`,
+        body: `${personLabel(subject.inviterName)}'s invitation is waiting for an answer.`,
       };
   }
 }
@@ -775,6 +919,18 @@ export function diffReminders(
  *    ever.
  *  - `session_reminder` — never reaches here. It is local (`NOTIFICATION_LOCAL`),
  *    scheduled by the device, and the OS dedupes it by `reminderId`.
+ *
+ * And the four nudges, whose keys are where their "at most once per …" lives —
+ * `NOTIFICATION_COOLDOWN` names the period and `cooldownBucket` computes it:
+ *
+ *  - `session_needs_one_yes` — the session id, no bucket. One chase per proposal:
+ *    the tally can cross the one-short line more than once as members change their
+ *    minds, and saying it again each time is how a useful nudge becomes nagging.
+ *  - `group_free_slot` — the group id, bucketed by ISO week, because the
+ *    availability mask it comes from is itself weekly.
+ *  - `group_quiet` — the group id, bucketed by fortnight.
+ *  - `invitation_unanswered` — the invitation id, no bucket. Exactly one chase,
+ *    ever; a second is the app arguing with a decision already made by silence.
  */
 export function notificationDedupeKey(input: {
   kind: NotificationKind;
@@ -784,4 +940,75 @@ export function notificationDedupeKey(input: {
   const bucket = (input.bucket ?? '').trim();
   const base = `${input.kind}:${input.subjectId}`;
   return bucket ? `${base}:${bucket}` : base;
+}
+
+/**
+ * The ISO-8601 week a moment falls in, as `'2026-W36'`.
+ *
+ * Hand-rolled because Hermes on Android shipped without `Intl` (HANDOFF §6), and
+ * because the Edge Function needs the identical answer in Deno — a helper that
+ * only exists in one runtime is the drift this file keeps warning about.
+ *
+ * **UTC, deliberately.** Every other date rule here reads the student's local
+ * clock, and this one must not: the only writer of a dedupe key is a server that
+ * has no idea what timezone the student is in — the schema has never stored one —
+ * so a local-clock bucket would put two different strings on the same fortnight
+ * and the unique index would stop refusing anything. The cost is that a student
+ * near a date line gets their week boundary a few hours off their own midnight,
+ * which nobody can perceive in a fortnightly nudge.
+ *
+ * ISO weeks start Monday and belong to the year containing their Thursday, which
+ * is why the arithmetic hops to Thursday first: 1 January 2027 is a Friday, so it
+ * is in week 53 of 2026, and a naive `Math.ceil(dayOfYear / 7)` would call it week
+ * 1 of 2027 and hand out a fresh bucket four days early.
+ */
+export function isoWeekLabel(at: Date): string {
+  const d = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+  // Monday = 1 … Sunday = 7, rather than JS's Sunday = 0.
+  const isoDay = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - isoDay);
+  const isoYear = d.getUTCFullYear();
+  const firstThursday = Date.UTC(isoYear, 0, 4);
+  const jan4Iso = new Date(firstThursday).getUTCDay() || 7;
+  const week1Monday = firstThursday - (jan4Iso - 1) * 86_400_000;
+  const week = Math.floor((d.getTime() - week1Monday) / (7 * 86_400_000)) + 1;
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
+}
+
+/**
+ * The bucket to pass to `notificationDedupeKey` for a kind whose cooldown is a
+ * period rather than its own subject.
+ *
+ * Null means "do not bucket", and it means that for two different reasons the
+ * caller does not need to tell apart: a `'none'` kind has no cooldown, and a
+ * `'run'` kind has one the clock cannot supply — for `message_activity` the sender
+ * passes the watermark it read instead, and passing this function's null would
+ * silently turn a per-run digest into a once-ever announcement. That is the one
+ * mistake worth stating out loud, because nothing would throw.
+ *
+ * A fortnight is expressed as the ISO week label of the fortnight's **first**
+ * week, aligned to odd week numbers, so the bucket changes every second week and
+ * still reads as a week somebody can find on a calendar — `'2026-W35'` covers
+ * weeks 35 and 36. Even labels therefore never appear, which is the tell that a
+ * fortnightly key is doing what it claims. Odd rather than even alignment because
+ * week 1 exists and week 0 does not: aligning down to even would bucket the first
+ * fortnight of every year as `W00`.
+ */
+export function cooldownBucket(kind: NotificationKind, at: Date): string | null {
+  switch (NOTIFICATION_COOLDOWN[kind]) {
+    case 'week':
+      return isoWeekLabel(at);
+    case 'fortnight': {
+      const label = isoWeekLabel(at);
+      const week = Number(label.slice(-2));
+      // Pairs are (1,2), (3,4) … (51,52), with 53 alone in the years that have
+      // one — a seam once every five or six years, in a nudge whose whole purpose
+      // is to be rare.
+      const start = week - ((week - 1) % 2);
+      return `${label.slice(0, -2)}${String(start).padStart(2, '0')}`;
+    }
+    case 'none':
+    case 'run':
+      return null;
+  }
 }

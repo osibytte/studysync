@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { MATERIALS_ALLOWED_MIME_TYPES } from '../chatRules';
+import { NOTIFICATION_KIND_LABEL, NOTIFICATION_LOCAL } from '../notificationRules';
+import type { NotificationKind } from '@/types/database';
 
 /**
  * Mirror-drift guard.
@@ -185,5 +187,59 @@ describe('bucket mime mirror: MATERIALS_ALLOWED_MIME_TYPES <-> storage.buckets i
     // Sorted, because the order in either place is arbitrary — Storage compares
     // membership, and the picker does not care either.
     expect([...MATERIALS_ALLOWED_MIME_TYPES].sort()).toEqual([...fromSql].sort());
+  });
+});
+
+/**
+ * Fifth mirror. The notification vocabulary, TypeScript against 0019's CHECK.
+ *
+ * `0019` says it in its own comment — "These names are NOT chosen here … Change
+ * one, change both" — and both directions fail without a stack trace:
+ *
+ *   - A kind added to the union and shipped in a sender that the CHECK has never
+ *     heard of is a `23514` at insert time, inside a batch job the student cannot
+ *     see. They are simply never told the thing happened.
+ *   - A value added to the CHECK and not to the union is the milder half: no copy,
+ *     no urgency, no cooldown, and `notificationContent` cannot render it — so the
+ *     kind exists in the database and can never legally be produced.
+ *
+ * The expected list is derived rather than typed out a third time: every kind
+ * `NOTIFICATION_LOCAL` does not mark as device-scheduled is, by definition, one a
+ * server sends and therefore one the table must accept. That makes this test also
+ * the guard on `session_reminder`'s absence, which 0019 insists on twice — mark a
+ * kind local and it must leave the CHECK; unmark one and it must appear.
+ */
+function sqlNotificationKinds(): string[] {
+  const sql = read('supabase/migrations/0019_stage5_notifications.sql').replace(/\r\n/g, '\n');
+  // Slice from the constraint itself: the comments above it name every kind in
+  // prose, and a name in a comment is not a value in the CHECK.
+  const check = sql.indexOf('check (kind in (');
+  expect(check).toBeGreaterThanOrEqual(0);
+  const close = sql.indexOf('))', check);
+  expect(close).toBeGreaterThan(check);
+  return [...sql.slice(check, close).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+}
+
+describe('notification kind mirror: NotificationKind <-> the CHECK in 0019', () => {
+  const fromSql = sqlNotificationKinds();
+  const sentFromTs = (Object.keys(NOTIFICATION_KIND_LABEL) as NotificationKind[]).filter(
+    (kind) => !NOTIFICATION_LOCAL[kind]
+  );
+
+  it('found both sides, so an empty parse cannot pass for agreement', () => {
+    expect(fromSql.length).toBeGreaterThanOrEqual(10);
+    expect(sentFromTs.length).toBe(fromSql.length);
+  });
+
+  it('accepts exactly the kinds a server sends', () => {
+    expect([...fromSql].sort()).toEqual([...sentFromTs].sort());
+  });
+
+  it('keeps the device-scheduled alarm out of the table entirely', () => {
+    // Not implied by the equality above in any way a reader can see at a glance,
+    // and it is the one value 0019 argues about at length: a sender that pushed it
+    // would give a student with a signal the alarm twice.
+    expect(fromSql).not.toContain('session_reminder');
+    expect(NOTIFICATION_LOCAL.session_reminder).toBe(true);
   });
 });

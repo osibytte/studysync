@@ -26,6 +26,30 @@ export interface NotificationPrefs {
   /** Non-urgent notifications per rolling day. Urgent alerts ignore this. */
   daily_cap: number;
   push_enabled: boolean;
+  /**
+   * Per-kind switches, all OPTIONAL and all defaulting to ON when absent.
+   *
+   * `notification_prefs` is jsonb and 0001's default does not contain these keys,
+   * so every account created before Stage 5 is missing all of them. Absence is
+   * therefore the normal case, not an edge case, and it has to mean something
+   * sensible without a backfill — which is why the fallback lives in one place
+   * (`notificationRules.ts`) rather than at each read site. Adding keys here needs
+   * no migration at all; that is the reason the column was jsonb in the first
+   * place.
+   *
+   * `push_enabled` above is the master switch and wins over all of them. The
+   * 30-minute study alarm is governed by none of this: it is scheduled by the
+   * device, is urgent, and the student turns it off through the OS.
+   */
+  notify_chat?: boolean;
+  notify_files?: boolean;
+  notify_sessions?: boolean;
+  notify_invitations?: boolean;
+  /** The four nudges, switchable one at a time because that is how a student keeps the ones they like. */
+  nudge_needs_one_yes?: boolean;
+  nudge_free_slot?: boolean;
+  nudge_group_quiet?: boolean;
+  nudge_unanswered_invitation?: boolean;
 }
 
 export interface AppUser {
@@ -457,6 +481,71 @@ export interface GroupMaterialRow {
   created_at: string;
   deleted_at: string | null;
   deleted_by: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — notifications (0019)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every kind of notification the app can send. One definition, imported by
+ * `notificationRules.ts`, which keys four exhaustive `Record`s on it — so adding a
+ * member here fails the typecheck until the copy, the urgency, the
+ * local-vs-remote answer and the cooldown have all been supplied for it. That is
+ * deliberate.
+ *
+ * `'session_reminder'` is in the union but **cannot appear in the notifications
+ * table** — see the check constraint in `0019`. It is scheduled on the device by
+ * `notifier.ts` and fires from the OS with no server involved, so there is no
+ * sender to write a ledger row, and a phone in airplane mode could not write one
+ * anyway. `NOTIFICATION_LOCAL` in `notificationRules.ts` is the machine-readable
+ * form of that split; the sender must never push a kind it marks true.
+ *
+ * The last four are the nudges the owner chose on 2026-09-05 for "whatever
+ * notification is smart to indulge students to study". All non-urgent and capped,
+ * because an engagement notification that ignores a student's stated limit is how
+ * notifications get switched off at the OS level — taking the 30-minute study
+ * alarm they actually wanted with them.
+ */
+export type NotificationKind =
+  | 'session_reminder'
+  | 'session_proposed'
+  | 'session_confirmed'
+  | 'session_cancelled'
+  | 'message_activity'
+  | 'file_shared'
+  | 'invitation'
+  | 'session_needs_one_yes'
+  | 'group_free_slot'
+  | 'group_quiet'
+  | 'invitation_unanswered';
+
+/** The subset `notifications.kind` accepts: everything a SERVER sends. */
+export type SentNotificationKind = Exclude<NotificationKind, 'session_reminder'>;
+
+/**
+ * One row per notification the sender delivered to one student (0019).
+ *
+ * `title` and `body` are stored as sent rather than re-derived, so the inbox shows
+ * what the phone showed: "4 new messages" stays true after a fifth arrives, and a
+ * session whose time later moves does not silently rewrite the notification that
+ * named the old one.
+ *
+ * `read_at` is the inbox's own cursor and is **not** `group_members.last_read_at`
+ * — dismissing a notification is not reading the conversation.
+ */
+export interface Notification {
+  notification_id: string;
+  user_id: string;
+  group_id: string | null;
+  kind: SentNotificationKind;
+  title: string;
+  body: string;
+  /** Exempt from `daily_cap`. Never true for a nudge. */
+  urgent: boolean;
+  dedupe_key: string;
+  created_at: string;
+  read_at: string | null;
 }
 
 

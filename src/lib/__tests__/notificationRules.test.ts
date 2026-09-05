@@ -1,5 +1,6 @@
 import {
   MAX_PENDING_REMINDERS,
+  NOTIFICATION_COOLDOWN,
   NOTIFICATION_KIND_LABEL,
   NOTIFICATION_LOCAL,
   NOTIFICATION_URGENT,
@@ -7,10 +8,12 @@ import {
   REMINDER_ID_PREFIX,
   REMINDER_LEAD_MIN,
   REMINDER_MIN_LEAD_MS,
+  cooldownBucket,
   diffReminders,
   isDailyCapReached,
   isReminderId,
   isWithinQuietHours,
+  isoWeekLabel,
   minutesUntilQuietHoursEnd,
   notificationContent,
   notificationDedupeKey,
@@ -26,13 +29,13 @@ import {
   shouldScheduleReminder,
 } from '../notificationRules';
 import type {
-  NotificationKind,
   NotificationSubject,
   PlannedReminder,
   ScheduledReminder,
 } from '../notificationRules';
 import type {
   GroupSessionRow,
+  NotificationKind,
   NotificationPrefs,
   SessionResponseValue,
   SessionStatus,
@@ -66,6 +69,18 @@ const ALL_KINDS: NotificationKind[] = [
   'message_activity',
   'file_shared',
   'invitation',
+  'session_needs_one_yes',
+  'group_free_slot',
+  'group_quiet',
+  'invitation_unanswered',
+];
+
+/** The four the owner chose on 2026-09-05. Held to stricter rules than the rest. */
+const NUDGE_KINDS: NotificationKind[] = [
+  'session_needs_one_yes',
+  'group_free_slot',
+  'group_quiet',
+  'invitation_unanswered',
 ];
 const ALL_STATUSES: SessionStatus[] = ['proposed', 'confirmed', 'cancelled'];
 const ALL_RESPONSES: SessionResponseValue[] = ['yes', 'no', 'maybe'];
@@ -157,6 +172,19 @@ function subjectFor(kind: NotificationKind): NotificationSubject {
       return { kind, groupName: 'Physics 101', sharerName: 'Ada', fileName: 'week4.pdf' };
     case 'invitation':
       return { kind, groupName: 'Physics 101', inviterName: 'Ada' };
+    case 'session_needs_one_yes':
+      return {
+        kind,
+        groupName: 'Physics 101',
+        startsAt: localIso(2026, 9, 6, 16, 0),
+        durationMin: 120,
+      };
+    case 'group_free_slot':
+      return { kind, groupName: 'Physics 101', slotLabel: 'tomorrow 4-6pm', othersFree: 2 };
+    case 'group_quiet':
+      return { kind, groupName: 'Physics 101', quietDays: 7 };
+    case 'invitation_unanswered':
+      return { kind, groupName: 'Physics 101', inviterName: 'Ada' };
   }
 }
 
@@ -177,6 +205,84 @@ describe('the kind tables', () => {
   it('exempts only the reminder and a cancellation from the daily cap', () => {
     const urgent = ALL_KINDS.filter((k) => NOTIFICATION_URGENT[k]);
     expect(urgent.sort()).toEqual(['session_cancelled', 'session_reminder']);
+  });
+});
+
+/**
+ * The nudges, held to the rules that keep them from costing the alarm.
+ *
+ * The failure this guards against is not a crash. It is a future change that
+ * makes one nudge urgent "because it is time-sensitive", which exempts it from
+ * `daily_cap`, which is how a student comes to switch notifications off at the OS
+ * level — and the 30-minute study reminder they actually asked for dies with the
+ * nudges. So these are assertions about product policy, deliberately, and a
+ * failure here should be read as a decision being reversed rather than a bug.
+ */
+describe('the four nudges', () => {
+  it('never marks a nudge urgent, so every one is capped', () => {
+    for (const kind of NUDGE_KINDS) {
+      expect(NOTIFICATION_URGENT[kind]).toBe(false);
+    }
+  });
+
+  it('sends every nudge from the server, never from the device', () => {
+    for (const kind of NUDGE_KINDS) {
+      expect(NOTIFICATION_LOCAL[kind]).toBe(false);
+    }
+  });
+
+  it('gives every nudge its own switch in the prefs screen', () => {
+    const labels = NUDGE_KINDS.map((k) => NOTIFICATION_KIND_LABEL[k]);
+    expect(labels.every((l) => typeof l === 'string' && l.length > 0)).toBe(true);
+    // Distinct, or two switches in the prefs screen read the same.
+    expect(new Set(labels).size).toBe(NUDGE_KINDS.length);
+  });
+
+  it('withholds a nudge inside quiet hours', () => {
+    for (const kind of NUDGE_KINDS) {
+      const decision = shouldNotify({
+        kind,
+        prefs: prefs(),
+        deliveredNonUrgentToday: 0,
+        at: at(23, 30),
+      });
+      expect(decision.deliver).toBe(false);
+      expect(decision.withheld).toBe('quiet_hours');
+    }
+  });
+
+  it('withholds a nudge once the cap is spent', () => {
+    for (const kind of NUDGE_KINDS) {
+      const decision = shouldNotify({
+        kind,
+        prefs: prefs({ daily_cap: 3 }),
+        deliveredNonUrgentToday: 3,
+        at: at(10),
+      });
+      expect(decision.deliver).toBe(false);
+      expect(decision.withheld).toBe('daily_cap');
+    }
+  });
+
+  it('lets a student turn one nudge off without touching the others', () => {
+    const off = shouldNotify({
+      kind: 'group_quiet',
+      prefs: prefs(),
+      deliveredNonUrgentToday: 0,
+      at: at(10),
+      kindEnabled: { group_quiet: false },
+    });
+    expect(off.deliver).toBe(false);
+    expect(off.withheld).toBe('kind_disabled');
+
+    const on = shouldNotify({
+      kind: 'group_free_slot',
+      prefs: prefs(),
+      deliveredNonUrgentToday: 0,
+      at: at(10),
+      kindEnabled: { group_quiet: false },
+    });
+    expect(on.deliver).toBe(true);
   });
 });
 
@@ -544,6 +650,58 @@ describe('notificationContent', () => {
     expect(body).toBe('Ada invited you to join.');
   });
 
+  it('asks for the one outstanding yes by name of the slot', () => {
+    const { title, body } = notificationContent(subjectFor('session_needs_one_yes'), now);
+    expect(title).toBe('One more yes needed');
+    expect(body).toBe('Physics 101 · Tomorrow, 4pm – 6pm is one yes from confirmed.');
+  });
+
+  it('counts the other free members without ever writing "0 others"', () => {
+    const base = { kind: 'group_free_slot', groupName: 'Physics 101', slotLabel: 'tomorrow 4-6pm' } as const;
+    expect(notificationContent({ ...base, othersFree: 2 }, now)).toEqual({
+      title: 'Physics 101 is free tomorrow 4-6pm',
+      body: 'You and 2 others are free tomorrow 4-6pm. Propose a study time?',
+    });
+    expect(notificationContent({ ...base, othersFree: 1 }, now).body).toBe(
+      'You and 1 other are free tomorrow 4-6pm. Propose a study time?'
+    );
+    // A group of one is real — 0006 disbands on empty, not on one.
+    expect(notificationContent({ ...base, othersFree: 0 }, now).body).toBe(
+      'You are free tomorrow 4-6pm. Propose a study time?'
+    );
+  });
+
+  it('drops the slot from the free-slot copy rather than leaving a gap', () => {
+    const { title, body } = notificationContent(
+      { kind: 'group_free_slot', groupName: 'Physics 101', slotLabel: '  ', othersFree: 2 },
+      now
+    );
+    expect(title).toBe('Physics 101 is free');
+    expect(body).toBe('You and 2 others are free at the same time. Propose a study time?');
+  });
+
+  it('says "a day" rather than "1 days", and never "0 days"', () => {
+    expect(notificationContent(subjectFor('group_quiet'), now)).toEqual({
+      title: 'Physics 101 has gone quiet',
+      body: 'Nothing here for 7 days. Send a message or propose a study time.',
+    });
+    const oneDay = { kind: 'group_quiet', groupName: 'Physics 101', quietDays: 1 } as const;
+    expect(notificationContent(oneDay, now).body).toBe(
+      'Nothing here for a day. Send a message or propose a study time.'
+    );
+    expect(notificationContent({ ...oneDay, quietDays: 0 }, now).body).toBe(
+      'Nothing here for a day. Send a message or propose a study time.'
+    );
+  });
+
+  it('chases an unanswered invitation without repeating the original wording', () => {
+    const { title, body } = notificationContent(subjectFor('invitation_unanswered'), now);
+    expect(title).toBe('Still deciding on Physics 101?');
+    expect(body).toBe("Ada's invitation is waiting for an answer.");
+    // Not the same banner twice: the first invitation reads differently.
+    expect(title).not.toBe(notificationContent(subjectFor('invitation'), now).title);
+  });
+
   it('never renders a blank name into a banner', () => {
     expect(
       notificationContent(
@@ -552,8 +710,16 @@ describe('notificationContent', () => {
       )
     ).toEqual({ title: 'New file in Your study group', body: 'A group member shared a file' });
   });
-});
 
+  it('falls back to a group label in every nudge, not just the chat kinds', () => {
+    for (const kind of NUDGE_KINDS) {
+      const subject = { ...subjectFor(kind), groupName: '   ' } as NotificationSubject;
+      const { title, body } = notificationContent(subject, now);
+      expect(`${title} ${body}`).toContain('Your study group');
+      expect(`${title} ${body}`).not.toMatch(/undefined|NaN/);
+    }
+  });
+});
 describe('reminderContent', () => {
   it('says the same thing as the subject form, from a row', () => {
     const now = new Date(2026, 8, 5, 9, 0, 0);
@@ -844,5 +1010,114 @@ describe('notificationDedupeKey', () => {
     expect(notificationDedupeKey({ kind: 'invitation', subjectId: 'i1', bucket: '  ' })).toBe(
       'invitation:i1'
     );
+  });
+});
+
+describe('isoWeekLabel', () => {
+  it('numbers the week a date falls in', () => {
+    // 2026-08-31 is a Monday; 2026-09-06 the Sunday that closes the same ISO week.
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 7, 31)))).toBe('2026-W36');
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 8, 5)))).toBe('2026-W36');
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 8, 6)))).toBe('2026-W36');
+    // Monday again, so a new week.
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 8, 7)))).toBe('2026-W37');
+  });
+
+  it('pads to two digits, so labels sort as text', () => {
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 0, 8)))).toBe('2026-W02');
+  });
+
+  it('gives a year-end week to the year owning its Thursday, not the calendar year', () => {
+    // 1 Jan 2027 is a Friday, so its ISO week began Monday 28 Dec 2026 and belongs
+    // to 2026. A naive dayOfYear/7 would hand out a fresh bucket four days early.
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 11, 28)))).toBe('2026-W53');
+    expect(isoWeekLabel(new Date(Date.UTC(2027, 0, 1)))).toBe('2026-W53');
+    expect(isoWeekLabel(new Date(Date.UTC(2027, 0, 4)))).toBe('2027-W01');
+  });
+
+  it('reads the clock in UTC, because only a server writes these', () => {
+    // Same instant, one expressed with an offset. A local-clock reading would put
+    // two strings on one fortnight and the unique index would stop refusing.
+    const a = isoWeekLabel(new Date('2026-09-05T23:30:00Z'));
+    const b = isoWeekLabel(new Date('2026-09-06T00:30:00+01:00'));
+    expect(b).toBe(a);
+  });
+
+  it('never emits a week outside 1..53', () => {
+    for (let day = 0; day < 400; day += 1) {
+      const at = new Date(Date.UTC(2026, 0, 1 + day));
+      const week = Number(isoWeekLabel(at).slice(-2));
+      expect(week).toBeGreaterThanOrEqual(1);
+      expect(week).toBeLessThanOrEqual(53);
+    }
+  });
+});
+
+describe('cooldownBucket', () => {
+  it('buckets a free-slot nudge by the week its mask repeats on', () => {
+    expect(NOTIFICATION_COOLDOWN.group_free_slot).toBe('week');
+    expect(cooldownBucket('group_free_slot', new Date(Date.UTC(2026, 8, 5)))).toBe('2026-W36');
+    expect(cooldownBucket('group_free_slot', new Date(Date.UTC(2026, 8, 7)))).toBe('2026-W37');
+  });
+
+  it('holds a quiet-group nudge to one label across two weeks', () => {
+    expect(NOTIFICATION_COOLDOWN.group_quiet).toBe('fortnight');
+    // Weeks 35 and 36 are one fortnight; 37 begins the next.
+    const w35 = cooldownBucket('group_quiet', new Date(Date.UTC(2026, 7, 24)));
+    const w36 = cooldownBucket('group_quiet', new Date(Date.UTC(2026, 8, 5)));
+    const w37 = cooldownBucket('group_quiet', new Date(Date.UTC(2026, 8, 7)));
+    expect(isoWeekLabel(new Date(Date.UTC(2026, 7, 24)))).toBe('2026-W35');
+    expect(w35).toBe('2026-W35');
+    expect(w36).toBe(w35);
+    expect(w37).toBe('2026-W37');
+  });
+
+  it('never labels a fortnight W00, which is what odd alignment buys', () => {
+    for (let day = 0; day < 400; day += 1) {
+      const label = cooldownBucket('group_quiet', new Date(Date.UTC(2026, 0, 1 + day)));
+      const week = Number((label ?? '').slice(-2));
+      expect(week).toBeGreaterThanOrEqual(1);
+      expect(week % 2).toBe(1);
+    }
+  });
+
+  it('returns null for a subject-keyed kind, and for the digest the caller buckets', () => {
+    const at = new Date(Date.UTC(2026, 8, 5));
+    expect(cooldownBucket('session_needs_one_yes', at)).toBeNull();
+    expect(cooldownBucket('invitation_unanswered', at)).toBeNull();
+    expect(cooldownBucket('session_confirmed', at)).toBeNull();
+    // 'run': the sender must pass the watermark instead. Passing this null would
+    // turn a per-run digest into a once-ever announcement, and nothing would throw.
+    expect(NOTIFICATION_COOLDOWN.message_activity).toBe('run');
+    expect(cooldownBucket('message_activity', at)).toBeNull();
+  });
+
+  it('answers for every kind', () => {
+    const at = new Date(Date.UTC(2026, 8, 5));
+    for (const kind of ALL_KINDS) {
+      expect(() => cooldownBucket(kind, at)).not.toThrow();
+      expect(NOTIFICATION_COOLDOWN[kind]).toBeDefined();
+    }
+  });
+
+  it('gives no nudge a daily cooldown', () => {
+    // The daily_cap argument again: a nudge that can recur daily will be all three
+    // of somebody's three daily notifications.
+    for (const kind of NUDGE_KINDS) {
+      expect(['none', 'week', 'fortnight']).toContain(NOTIFICATION_COOLDOWN[kind]);
+    }
+  });
+
+  it('composes into a key a re-run collides on', () => {
+    const key = (at: Date) =>
+      notificationDedupeKey({
+        kind: 'group_quiet',
+        subjectId: 'g1',
+        bucket: cooldownBucket('group_quiet', at),
+      });
+    expect(key(new Date(Date.UTC(2026, 8, 5)))).toBe('group_quiet:g1:2026-W35');
+    // Two days later, still inside the fortnight: same key, so the insert conflicts.
+    expect(key(new Date(Date.UTC(2026, 8, 6)))).toBe(key(new Date(Date.UTC(2026, 8, 5))));
+    expect(key(new Date(Date.UTC(2026, 8, 21)))).not.toBe(key(new Date(Date.UTC(2026, 8, 5))));
   });
 });
