@@ -62,15 +62,35 @@ function json(body: unknown, status = 200): Response {
 function toSummary(match: {
   score: number;
   scheduleScore: number;
+  proficiencyScore: number;
   fillScore: number;
   sharedSlots: number;
 }) {
   return {
     score: match.score,
     schedule_score: match.scheduleScore,
+    proficiency_score: match.proficiencyScore,
     fill_score: match.fillScore,
     shared_slots: match.sharedSlots,
   };
+}
+
+/**
+ * A candidate's representative level: the mean of whoever has rated the course.
+ *
+ * Null when nobody in it has, which the scorer reads as the neutral middle band
+ * rather than as a claim. A mean rather than a min or a max because the pairwise
+ * term measures the gap the requester would be joining across, and one confident
+ * member does not make a group confident.
+ */
+function meanLevel(levels: number[]): number | null {
+  if (levels.length === 0) return null;
+  return levels.reduce((sum, level) => sum + level, 0) / levels.length;
+}
+
+/** A proficiency column value from the DB, kept only if it is a real rating. */
+function readLevel(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -164,7 +184,7 @@ interface RequesterData {
   profile: ScoringProfile;
 }
 
-/** The requester's own enrolment for this course: availability. */
+/** The requester's own enrolment for this course: availability + self-rating. */
 async function loadRequester(
   admin: SupabaseClient,
   uid: string,
@@ -172,7 +192,7 @@ async function loadRequester(
 ): Promise<RequesterData | null> {
   const { data, error } = await admin
     .from('user_courses')
-    .select('user_course_id, availability')
+    .select('user_course_id, availability, proficiency')
     .eq('user_id', uid)
     .eq('course_id', courseId)
     .maybeSingle();
@@ -184,6 +204,7 @@ async function loadRequester(
     userCourseId: data.user_course_id,
     profile: {
       availability: decodeAvailability(data.availability),
+      proficiency: readLevel(data.proficiency),
     },
   };
 }
@@ -231,7 +252,7 @@ async function scoreExistingGroups(
   };
 
   const shaped: GroupCandidate[] = eligible.map((g: any) => {
-    const members = membersByGroup.get(g.group_id) ?? { count: 0, grids: [] };
+    const members = membersByGroup.get(g.group_id) ?? { count: 0, grids: [], levels: [] };
     const commonGrid = groupScheduleProfile(members.grids);
     return {
       group_id: g.group_id,
@@ -241,6 +262,7 @@ async function scoreExistingGroups(
       availability_summary: describeSelection(commonGrid, 4),
       already_requested: requestedGroupIds.has(g.group_id),
       availability: commonGrid,
+      proficiency: meanLevel(members.levels),
       // A member row should always exist (the creator), but fall back to the
       // real count if the members read returned nothing for this group.
       memberCount: members.count,
@@ -280,7 +302,7 @@ async function scoreLoneStudents(
   // Everyone enrolled in this course (with their availability + name).
   const { data: enrolments, error } = await admin
     .from('user_courses')
-    .select('user_id, availability, users ( full_name, department )')
+    .select('user_id, availability, proficiency, users ( full_name, department )')
     .eq('course_id', courseId)
     .neq('user_id', uid)
     .limit(MAX_LONE_STUDENTS_SCANNED);
@@ -309,6 +331,7 @@ async function scoreLoneStudents(
         department: r.users?.department ?? null,
         availability_summary: describeSelection(grid, 4),
         availability: grid,
+        proficiency: readLevel(r.proficiency),
         // A hypothetical pairing: the other student is the sole existing member.
         memberCount: 1,
         maxMembers: 8, // the spec's soft default cap for a new group
@@ -346,6 +369,8 @@ async function loadMyGroupIds(
 interface GroupMembership {
   count: number;
   grids: AvailabilityGrid[];
+  /** Members' self-ratings on this course; unrated members are simply absent. */
+  levels: number[];
 }
 
 /**
@@ -371,26 +396,31 @@ async function loadMembersByGroup(
   const memberRows = members ?? [];
   const memberUserIds = Array.from(new Set(memberRows.map((m: any) => m.user_id)));
 
-  // One read of every relevant member's availability on this course.
+  // One read of every relevant member's enrolment on this course.
   const availabilityByUser = new Map<string, AvailabilityGrid>();
+  const levelByUser = new Map<string, number>();
   if (memberUserIds.length > 0) {
     const { data: courses, error: cErr } = await admin
       .from('user_courses')
-      .select('user_id, availability')
+      .select('user_id, availability, proficiency')
       .eq('course_id', courseId)
       .in('user_id', memberUserIds);
     if (cErr) throw cErr;
     for (const c of courses ?? []) {
       availabilityByUser.set((c as any).user_id, decodeAvailability((c as any).availability));
+      const level = readLevel((c as any).proficiency);
+      if (level !== null) levelByUser.set((c as any).user_id, level);
     }
   }
 
   for (const m of memberRows) {
     const gid = (m as any).group_id;
-    const entry = result.get(gid) ?? { count: 0, grids: [] };
+    const entry = result.get(gid) ?? { count: 0, grids: [], levels: [] };
     entry.count += 1;
     const grid = availabilityByUser.get((m as any).user_id);
     if (grid) entry.grids.push(grid);
+    const level = levelByUser.get((m as any).user_id);
+    if (level !== undefined) entry.levels.push(level);
     result.set(gid, entry);
   }
   return result;

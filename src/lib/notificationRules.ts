@@ -63,6 +63,11 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
   message_activity: 'New messages',
   file_shared: 'Shared files',
   invitation: 'Group invitations',
+  // Not switchable, and the label is only ever a heading in the inbox: you asked
+  // the system to place you, so being told it did is the answer to your own
+  // question. A switch for it would be a switch for "tell me whether the thing I
+  // applied for happened".
+  group_matched: 'Being matched into a group',
   session_needs_one_yes: 'Study times needing one more yes',
   group_free_slot: 'When your group is all free',
   group_quiet: 'When a group goes quiet',
@@ -81,6 +86,12 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
  * who has already had three notifications today does not need a fourth to know
  * a file was shared.
  *
+ * `group_matched` is the third, added with 0020. A student who applied to be matched
+ * has been waiting — possibly for weeks — with nothing else they are allowed to do
+ * about it, and the group's first conversation happens whether or not anybody told
+ * them. It also cannot flood: its dedupe key is the group id, so it fires once per
+ * student per group and never again.
+ *
  * **No nudge is ever urgent, and this is the line that protects the alarm.** A
  * nudge that ignores the cap is how a student comes to switch notifications off
  * at the OS level, and the 30-minute reminder they actually asked for dies with
@@ -92,6 +103,7 @@ export const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
 export const NOTIFICATION_URGENT: Record<NotificationKind, boolean> = {
   session_reminder: true,
   session_cancelled: true,
+  group_matched: true,
   session_proposed: false,
   session_confirmed: false,
   message_activity: false,
@@ -126,6 +138,11 @@ export const NOTIFICATION_LOCAL: Record<NotificationKind, boolean> = {
   message_activity: false,
   file_shared: false,
   invitation: false,
+  // Written by the DATABASE — `create_system_group` inserts it in the same
+  // transaction that creates the group (0020 §8) — which is remote, not local, but
+  // also not composed by the sender. Step 6's sender therefore has to push urgent
+  // rows it did not write itself, or this one only ever appears in the in-app inbox.
+  group_matched: false,
   session_needs_one_yes: false,
   group_free_slot: false,
   group_quiet: false,
@@ -172,6 +189,8 @@ export const NOTIFICATION_COOLDOWN: Record<NotificationKind, NotificationCooldow
   message_activity: 'run',
   file_shared: 'none',
   invitation: 'none',
+  // The group id is the whole rule: you are placed in a given group once.
+  group_matched: 'none',
   session_needs_one_yes: 'none',
   group_free_slot: 'week',
   group_quiet: 'fortnight',
@@ -448,6 +467,16 @@ export interface NotificationContent {
  * is checked for exhaustiveness: add a kind to `NotificationKind` and this file
  * stops compiling until it has words. A notification with no copy is not a
  * smaller feature, it is an empty banner.
+ *
+ * ONE KIND IS DELIBERATELY ABSENT. `'group_matched'` has no arm here because its
+ * words are composed in SQL, inside `create_system_group` (0020 §8): the row has to
+ * be written in the same transaction that creates the group, or a run that dies in
+ * between leaves students grouped and never told with nothing to retry it. Adding an
+ * arm would give that sentence a second spelling, which is precisely what this union
+ * exists to prevent. Note the consequence — a new kind that IS sender-composed still
+ * breaks the switch until it has copy, but the compiler cannot tell you when a new
+ * kind should have been added here rather than to a migration. That call is made once,
+ * per kind, and written down at the kind.
  *
  * `groupName` is on every arm because `GroupSessionRow` does not carry one — the
  * RPC returns sessions for a group already known to the caller (see

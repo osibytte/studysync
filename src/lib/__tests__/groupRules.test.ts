@@ -1,31 +1,43 @@
 import {
   JOINABLE_STATUSES,
-  MATCHING_PREF_HINT,
-  MATCHING_PREF_LABEL,
+  MATCHING_STEP_TITLE,
+  PROFICIENCY_CHOICES,
+  PROFICIENCY_HINT,
+  PROFICIENCY_LABEL,
   STATUS_HINT,
   STATUS_LABEL,
+  asProficiency,
+  canApplyForMatching,
   canInvite,
   canRequestToJoin,
   capacityLabel,
   defaultGroupName,
   displayName,
-  inMatchingPool,
   isCreator,
   isFull,
   isJoinable,
   isLive,
+  matchingStep,
+  matchingStepBody,
   meetRuleLabel,
   memberLine,
   requiresEveryone,
   scorePercent,
   seatsLeft,
+  serverNow,
   sortMyGroups,
+  windowBanner,
+  windowPhase,
+  windowWhenLabel,
+  type MatchingStep,
+  type WindowPhase,
 } from '../groupRules';
 import type {
   GroupMemberDetailRow,
   GroupStatus,
-  MatchingPref,
+  MatchingWindowState,
   MyGroupRow,
+  Proficiency,
 } from '@/types/database';
 
 /**
@@ -309,38 +321,302 @@ describe('scorePercent', () => {
   });
 });
 
-describe('matching preference', () => {
-  const PREFS: MatchingPref[] = ['system', 'self_organized'];
+// ---------------------------------------------------------------------------
+// How you rate yourself (user_courses.proficiency, 0020)
+// ---------------------------------------------------------------------------
 
-  it('labels and explains both preferences', () => {
-    for (const pref of PREFS) {
-      expect(MATCHING_PREF_LABEL[pref].length).toBeGreaterThan(0);
-      expect(MATCHING_PREF_HINT[pref].length).toBeGreaterThan(0);
+describe('proficiency bands', () => {
+  it('words every band, twice over', () => {
+    // The chip and its one-line hint are the whole of what a student reads
+    // before answering, so neither may be blank for any band.
+    for (const level of PROFICIENCY_CHOICES) {
+      expect(PROFICIENCY_LABEL[level].length).toBeGreaterThan(0);
+      expect(PROFICIENCY_HINT[level].length).toBeGreaterThan(0);
     }
   });
 
-  it('never describes opting out as losing the rest of group formation', () => {
-    // The hint is the only place the app explains the choice, and a student who
-    // reads "you will not be matched" as "you cannot join groups" opts out of
-    // the product rather than the batch run.
-    expect(MATCHING_PREF_HINT.self_organized).toMatch(/invitation|request|brows/i);
+  it('describes the course going badly, not the student being bad at it', () => {
+    // 'Struggling' has to be safe to pick — it is the answer that gets you a
+    // group with somebody who can explain. Copy that grades the student instead
+    // is what makes people round themselves upward and break the mixing rule.
+    const copy = PROFICIENCY_CHOICES.flatMap((level) => [
+      PROFICIENCY_LABEL[level],
+      PROFICIENCY_HINT[level],
+    ]).join(' ');
+    expect(copy).not.toMatch(/\b(weak|poor|bad|stupid|smart|clever|expert|beginner)\b/i);
   });
 
-  it('pools an opted-in student who is not grouped on the course', () => {
-    expect(inMatchingPool('system', false)).toBe(true);
+  it('offers the bands lowest first, so none of them reads as the default', () => {
+    expect(PROFICIENCY_CHOICES).toEqual([1, 2, 3]);
   });
 
-  it('excludes an opted-in student already grouped on the course', () => {
-    // run-batch-matching subtracts existing members from the pool, so an opted-in
-    // student who already has a group is skipped rather than placed twice.
-    expect(inMatchingPool('system', true)).toBe(false);
-  });
-
-  it('excludes a self-organizing student either way', () => {
-    expect(inMatchingPool('self_organized', false)).toBe(false);
-    expect(inMatchingPool('self_organized', true)).toBe(false);
+  it('narrows a stored value and rejects everything else', () => {
+    expect(asProficiency(1)).toBe(1);
+    expect(asProficiency(2)).toBe(2);
+    expect(asProficiency(3)).toBe(3);
+    // Null is every enrolment made before 0020; the rest is what a hand-written
+    // row, a loosened CHECK or a JSON round-trip could put there. All of them
+    // mean "not rated", which is a step the Apply screen knows how to ask about.
+    expect(asProficiency(null)).toBeNull();
+    expect(asProficiency(undefined)).toBeNull();
+    expect(asProficiency(0)).toBeNull();
+    expect(asProficiency(4)).toBeNull();
+    expect(asProficiency(2.5)).toBeNull();
+    expect(asProficiency('2')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The registration period (matching_windows + matching_window_state(), 0020)
+// ---------------------------------------------------------------------------
+
+/**
+ * A timestamp built from LOCAL parts.
+ *
+ * `windowWhenLabel` reads through `dayLabel` and `formatClock`, both of which
+ * work in the device's timezone. A UTC literal would therefore make "Today"
+ * depend on which machine ran the suite — green in Lagos, red in Los Angeles.
+ */
+function at(y: number, m: number, d: number, h = 0, min = 0): string {
+  return new Date(y, m - 1, d, h, min).toISOString();
+}
+
+/** A window as `matching_window_state()` returns it: open, with both ends set. */
+function windowState(over: Partial<MatchingWindowState> = {}): MatchingWindowState {
+  return {
+    server_now: at(2026, 9, 5, 12, 0),
+    is_open: true,
+    window_id: 'w1',
+    label: 'Semester 1 matching',
+    opens_at: at(2026, 9, 1, 9, 0),
+    closes_at: at(2026, 9, 12, 17, 0),
+    ...over,
+  };
+}
+
+describe('windowPhase', () => {
+  it('separates a period that is open from one that is only scheduled', () => {
+    const open: WindowPhase = windowPhase(windowState());
+    expect(open).toBe('open');
+    expect(windowPhase(windowState({ is_open: false }))).toBe('upcoming');
+  });
+
+  it('reads an absent period as none, however it arrives', () => {
+    // The RPC answers with a row of nulls rather than no row when nothing is
+    // scheduled, and the hook holds null until it answers at all. Both mean "no
+    // period", and neither may read as upcoming — the Apply screen would then
+    // promise a window that is never going to open.
+    expect(windowPhase(windowState({ window_id: null, is_open: false }))).toBe('none');
+    expect(windowPhase(null)).toBe('none');
+    expect(windowPhase(undefined)).toBe('none');
+  });
+
+  it('trusts is_open over the timestamps', () => {
+    // The SQL decides what open means, against its own clock. A closes_at that
+    // looks past to this device is not the client's to reinterpret.
+    expect(windowPhase(windowState({ closes_at: at(2026, 9, 4, 17, 0) }))).toBe('open');
+  });
+});
+
+describe('serverNow', () => {
+  it('dates the screen by the instant the server reported', () => {
+    expect(serverNow(windowState()).toISOString()).toBe(at(2026, 9, 5, 12, 0));
+  });
+
+  it('falls back to the device clock when there is nothing to trust', () => {
+    // The banner still renders while the RPC is in flight, and offline it never
+    // answers. "Roughly now" is right enough to pick a day label; an Invalid Date
+    // would print an empty deadline into the middle of a sentence.
+    for (const state of [null, undefined, windowState({ server_now: 'not a date' })]) {
+      expect(Math.abs(serverNow(state).getTime() - Date.now())).toBeLessThan(5000);
+    }
+  });
+});
+
+describe('windowWhenLabel', () => {
+  const now = new Date(2026, 8, 5, 9, 0);
+
+  it('reads a deadline later the same day as a time of day', () => {
+    expect(windowWhenLabel(at(2026, 9, 5, 17, 30), now)).toBe('Today, 5:30pm');
+  });
+
+  it('spells out a date further off', () => {
+    expect(windowWhenLabel(at(2026, 9, 12, 17, 0), now)).toBe('12 September, 5pm');
+  });
+
+  it('renders nothing at all for a missing timestamp', () => {
+    // Both ends come back null when no period is scheduled, and the banner
+    // interpolates this straight into a sentence.
+    expect(windowWhenLabel(null)).toBe('');
+    expect(windowWhenLabel(undefined)).toBe('');
+  });
+});
+
+describe('windowBanner', () => {
+  it('names the period and when it shuts', () => {
+    expect(windowBanner(windowState())).toBe(
+      'Semester 1 matching is open until 12 September, 5pm.'
+    );
+  });
+
+  it('names when an upcoming period opens instead', () => {
+    expect(windowBanner(windowState({ is_open: false }))).toBe(
+      'Semester 1 matching opens 1 September, 9am.'
+    );
+  });
+
+  it('still forms a sentence when the coordinator left the label empty', () => {
+    expect(windowBanner(windowState({ label: null }))).toMatch(/^Matching is open until/);
+  });
+
+  it('dates the deadline against the server clock, not the device', () => {
+    // A phone a day fast would otherwise read tonight's deadline as "Yesterday"
+    // while the Apply button beside it is still live. Carrying server_now on the
+    // same row as closes_at is what stops the screen contradicting itself.
+    const state = windowState({
+      server_now: at(2026, 9, 12, 9, 0),
+      closes_at: at(2026, 9, 12, 17, 0),
+    });
+    expect(windowBanner(state)).toContain('Today, 5pm');
+  });
+
+  it('answers an absent period with what still works', () => {
+    // The owner's rule, on 2026-09-05: a shut window is not a shut app. Only
+    // automatic matching waits on it, so this line has to name the three routes
+    // into a group that do not — and must not date anything.
+    for (const state of [null, windowState({ window_id: null, is_open: false })]) {
+      const banner = windowBanner(state);
+      expect(banner).toMatch(/brows/i);
+      expect(banner).toMatch(/join/i);
+      expect(banner).toMatch(/your own/i);
+      expect(banner).not.toMatch(/until|opens/i);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Where one enrolment stands in the matching flow (0020)
+// ---------------------------------------------------------------------------
+
+/** Listed out, so adding a sixth step fails here as well as in the type. */
+const ALL_STEPS: MatchingStep[] = [
+  'grouped',
+  'applied',
+  'needs_rating',
+  'needs_availability',
+  'ready',
+];
+
+/** An enrolment as the Apply screen sees it: rated, never applied. */
+function enrolment(over: { proficiency?: Proficiency | null; applied_at?: string | null } = {}) {
+  return { proficiency: 2 as Proficiency | null, applied_at: null as string | null, ...over };
+}
+
+describe('matchingStep', () => {
+  it('is ready once the course is rated and some free time is picked', () => {
+    const step: MatchingStep = matchingStep(enrolment(), 6, false);
+    expect(step).toBe('ready');
+  });
+
+  it('asks for the rating first when both are missing', () => {
+    // Both are blank on a course just added, and only one thing may ever be
+    // asked for at a time. The rating goes first because it is one tap on the
+    // courses screen, where the grid is a screenful of them.
+    expect(matchingStep(enrolment({ proficiency: null }), 0, false)).toBe('needs_rating');
+    expect(matchingStep(enrolment({ proficiency: null }), 6, false)).toBe('needs_rating');
+    expect(matchingStep(enrolment({ proficiency: 3 }), 0, false)).toBe('needs_availability');
+  });
+
+  it('resolves grouped before applied, because applied_at is never cleared', () => {
+    // The reason that precedence is written down: matched state is DERIVED from
+    // membership rather than stored. Read the other way round, a student the run
+    // had already placed would sit there being told they were still waiting.
+    const applied = enrolment({ proficiency: 1, applied_at: at(2026, 9, 2, 10, 0) });
+    expect(matchingStep(applied, 6, true)).toBe('grouped');
+    expect(matchingStep(applied, 6, false)).toBe('applied');
+  });
+
+  it('says grouped even for a course that could never have applied', () => {
+    // A group joined by invitation or an approved request, on a course with no
+    // rating and no free time picked. There is nothing left to fix here, so
+    // nothing may be asked for.
+    expect(matchingStep(enrolment({ proficiency: null }), 0, true)).toBe('grouped');
+  });
+
+  it('holds an application whatever the rating and free time say afterwards', () => {
+    // Availability stays editable after applying — the profile screen is not
+    // locked — and the pool has already been joined. Sliding back to
+    // needs_availability would offer an Apply button for something that cannot
+    // be applied for twice.
+    expect(matchingStep(enrolment({ proficiency: null, applied_at: at(2026, 9, 2, 10, 0) }), 0, false)).toBe(
+      'applied'
+    );
+  });
+});
+
+describe('what each step says', () => {
+  const ALL_PHASES: WindowPhase[] = ['open', 'upcoming', 'none'];
+
+  it('titles and explains every step, in every phase', () => {
+    for (const step of ALL_STEPS) {
+      expect(MATCHING_STEP_TITLE[step].length).toBeGreaterThan(0);
+      for (const phase of ALL_PHASES) {
+        expect(matchingStepBody(step, phase).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('lets the window reword one step and one step only', () => {
+    // The period gates a single action, so it may change the wording of a single
+    // step. If a second one starts reading differently by phase, the screen has
+    // begun implying the window blocks more than applying — which is exactly the
+    // reading the owner ruled out.
+    for (const step of ALL_STEPS.filter((s) => s !== 'ready')) {
+      expect(matchingStepBody(step, 'upcoming')).toBe(matchingStepBody(step, 'open'));
+      expect(matchingStepBody(step, 'none')).toBe(matchingStepBody(step, 'open'));
+    }
+    expect(matchingStepBody('ready', 'none')).not.toBe(matchingStepBody('ready', 'open'));
+  });
+
+  it('tells a ready student with no open period what to do instead', () => {
+    // The banner's rule again, in the place the student is actually looking: the
+    // card whose button is greyed out. An upcoming period reads the same, since
+    // browsing and invitations work just as well while one is pending.
+    const body = matchingStepBody('ready', 'none');
+    expect(body).toMatch(/brows/i);
+    expect(body).toMatch(/invit/i);
+    expect(matchingStepBody('ready', 'upcoming')).toBe(body);
+  });
+
+  it('warns that applying goes one way before the tap, and again after', () => {
+    expect(matchingStepBody('ready', 'open')).toMatch(/only goes one way/i);
+    expect(matchingStepBody('applied', 'open')).toMatch(/cannot withdraw/i);
+  });
+
+  it('promises the derived pool, so leaving a group is not a re-application', () => {
+    const body = matchingStepBody('grouped', 'open');
+    expect(body).toMatch(/leave/i);
+    expect(body).toMatch(/pool/i);
+  });
+});
+
+describe('canApplyForMatching', () => {
+  it('needs a ready course and an open period, both', () => {
+    expect(canApplyForMatching('ready', 'open')).toBe(true);
+    expect(canApplyForMatching('ready', 'upcoming')).toBe(false);
+    expect(canApplyForMatching('ready', 'none')).toBe(false);
+  });
+
+  it('refuses every other step even while the period is open', () => {
+    // Mirrors request_matching's own gate. The RPC is the enforcement and this
+    // only decides whether the button is tappable — but a tappable button that
+    // always fails is a bug in its own right.
+    for (const step of ALL_STEPS.filter((s) => s !== 'ready')) {
+      expect(canApplyForMatching(step, 'open')).toBe(false);
+    }
+  });
+});
+
 
 /**
  * The shared-time rule, as the caption states it.

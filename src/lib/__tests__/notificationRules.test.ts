@@ -60,8 +60,20 @@ function at(h: number, mi = 0): Date {
   return new Date(2026, 8, 5, h, mi, 0);
 }
 
-/** Listed out so adding a union member fails here as well as in the type. */
-const ALL_KINDS: NotificationKind[] = [
+/**
+ * Every kind whose words are composed on THIS DEVICE — which is all of them but
+ * one. `group_matched`'s copy is written in SQL, inside `create_system_group`
+ * (0020 §8), so `NotificationSubject` deliberately has no arm for it and
+ * `notificationContent` cannot render it.
+ *
+ * Excluding it by name rather than filtering the list is what keeps that one
+ * deliberate hole from hiding a real one: `subjectFor`'s switch stays exhaustive,
+ * so a NEW kind added to the union still fails to compile here until somebody has
+ * decided which side of that line it falls on.
+ */
+type ComposedKind = Exclude<NotificationKind, 'group_matched'>;
+
+const COMPOSED_KINDS: ComposedKind[] = [
   'session_reminder',
   'session_proposed',
   'session_confirmed',
@@ -75,8 +87,11 @@ const ALL_KINDS: NotificationKind[] = [
   'invitation_unanswered',
 ];
 
+/** Listed out so adding a union member fails here as well as in the type. */
+const ALL_KINDS: NotificationKind[] = [...COMPOSED_KINDS, 'group_matched'];
+
 /** The four the owner chose on 2026-09-05. Held to stricter rules than the rest. */
-const NUDGE_KINDS: NotificationKind[] = [
+const NUDGE_KINDS: ComposedKind[] = [
   'session_needs_one_yes',
   'group_free_slot',
   'group_quiet',
@@ -139,7 +154,7 @@ function reminderSubject(over: Partial<ReminderSubject> = {}): ReminderSubject {
 }
 
 /** One subject per kind, so the copy tests can sweep the whole union. */
-function subjectFor(kind: NotificationKind): NotificationSubject {
+function subjectFor(kind: ComposedKind): NotificationSubject {
   switch (kind) {
     case 'session_reminder':
       return reminderSubject();
@@ -202,9 +217,13 @@ describe('the kind tables', () => {
     expect(local).toEqual(['session_reminder']);
   });
 
-  it('exempts only the reminder and a cancellation from the daily cap', () => {
+  it('exempts only the reminder, a cancellation and being matched from the daily cap', () => {
     const urgent = ALL_KINDS.filter((k) => NOTIFICATION_URGENT[k]);
-    expect(urgent.sort()).toEqual(['session_cancelled', 'session_reminder']);
+    expect(urgent.sort()).toEqual([
+      'group_matched',
+      'session_cancelled',
+      'session_reminder',
+    ]);
   });
 });
 
@@ -574,8 +593,8 @@ describe('shouldScheduleReminder', () => {
 describe('notificationContent', () => {
   const now = new Date(2026, 8, 5, 9, 0, 0); // the day before the session
 
-  it('gives every kind words', () => {
-    for (const kind of ALL_KINDS) {
+  it('gives every device-composed kind words', () => {
+    for (const kind of COMPOSED_KINDS) {
       const { title, body } = notificationContent(subjectFor(kind), now);
       expect(title.length).toBeGreaterThan(0);
       expect(body.length).toBeGreaterThan(0);

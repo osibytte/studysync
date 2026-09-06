@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,10 +16,15 @@ import { useNetwork } from '@/context/NetworkContext';
 import { useCourses } from '@/hooks/useCourses';
 import { useUserCourses } from '@/hooks/useUserCourses';
 import { EMPTY_MASK } from '@/lib/availability';
+import {
+  PROFICIENCY_CHOICES,
+  PROFICIENCY_HINT,
+  PROFICIENCY_LABEL,
+} from '@/lib/groupRules';
 import { enqueue } from '@/lib/outbox';
-import { friendlyError, supabase } from '@/lib/supabase';
+import { friendlyError, isNetworkError, supabase } from '@/lib/supabase';
 import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
-import type { Course, UserCourseWithDetail } from '@/types/database';
+import type { Course, Proficiency, UserCourseWithDetail } from '@/types/database';
 
 interface Props {
   /** Onboarding shows the step bar; editing later does not. */
@@ -26,6 +32,18 @@ interface Props {
   footerLabel: (count: number) => string;
   /** Disabled until at least one course is picked, during onboarding only. */
   requireAtLeastOne?: boolean;
+  /**
+   * Block the footer until every picked course carries a rating.
+   *
+   * Onboarding only, and the asymmetry is deliberate. Rating is part of picking a
+   * course now (0020), so the onboarding step should not let a student past a
+   * half-answered list. The later edit route only SAYS what is missing: an
+   * enrolment made before 0020 has no rating, this screen's footer is the only way
+   * off it, and trapping somebody there over a field they did not know existed is
+   * worse than an unrated row. Applying is where the rating is actually required,
+   * and `request_matching` refuses it with a sentence that explains itself.
+   */
+  requireRatings?: boolean;
   onDone: () => void;
   subtitle?: string;
 }
@@ -45,6 +63,7 @@ export function CoursePicker({
   showStepHeader = false,
   footerLabel,
   requireAtLeastOne = false,
+  requireRatings = false,
   onDone,
   subtitle,
 }: Props) {
@@ -57,10 +76,19 @@ export function CoursePicker({
 
   const [query, setQuery] = useState('');
   const [busyCourseId, setBusyCourseId] = useState<string | null>(null);
+  // Separate from busyCourseId: that one swaps the row's checkbox for a spinner,
+  // and rating a course does not change whether it is picked.
+  const [ratingCourseId, setRatingCourseId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const selectedIds = useMemo(
-    () => new Set(userCourses.map((uc) => uc.course_id)),
+  const byCourseId = useMemo(
+    () => new Map(userCourses.map((uc) => [uc.course_id, uc])),
+    [userCourses]
+  );
+
+  /** Picked but not yet rated — what the footer waits on, and names. */
+  const unrated = useMemo(
+    () => userCourses.filter((uc) => uc.proficiency == null),
     [userCourses]
   );
 
@@ -94,8 +122,10 @@ export function CoursePicker({
       user_id: userId,
       course_id: course.course_id,
       availability: EMPTY_MASK,
-      // New enrolments join the system-matching pool by default (the DB default).
-      matching_pref: 'system',
+      // Both null, and both are the column defaults: nobody has rated this yet,
+      // and nothing puts a student in the matching pool on their own behalf (0020).
+      proficiency: null,
+      applied_at: null,
       created_at: new Date().toISOString(),
       course,
     };
@@ -136,6 +166,17 @@ export function CoursePicker({
     }
   }
 
+  /**
+   * Remove an enrolment.
+   *
+   * Unlike `addCourse`, a failure here is NOT queued blindly. 0020 §5 gives this
+   * delete a server-side refusal it never had: an outstanding application cannot be
+   * withdrawn by dropping the course and adding it back, so the trigger raises
+   * P0001 with a sentence the student needs to read. Queueing that would
+   * dead-letter it silently and leave the row missing from the list until a
+   * reload — so only a network error falls through to the outbox, and everything
+   * else rolls the row back and shows why.
+   */
   async function removeCourse(courseId: string) {
     if (!userId) return;
     setFormError(null);
@@ -157,34 +198,125 @@ export function CoursePicker({
         await refreshPending();
       }
     } catch (error) {
-      try {
-        await enqueue('course.remove', { course_id: courseId }, userId);
-        await refreshPending();
-      } catch {
+      if (!isNetworkError(error)) {
         setLocal(previous);
         setFormError(friendlyError(error));
+      } else {
+        try {
+          await enqueue('course.remove', { course_id: courseId }, userId);
+          await refreshPending();
+        } catch {
+          setLocal(previous);
+          setFormError(friendlyError(error));
+        }
       }
     } finally {
       setBusyCourseId(null);
     }
   }
 
-  const canContinue = !requireAtLeastOne || userCourses.length > 0;
+  /**
+   * Save the student's own rating of one course (0020).
+   *
+   * Last-write-wins on a private field, which is what makes it queueable — see
+   * `course.proficiency` in outbox.ts. The write is keyed on `(user_id,
+   * course_id)` rather than `user_course_id` for the same reason the queued action
+   * is: a course added offline has only a `temp-` id, and there is a live window
+   * where the enrolment is picked on screen but its row has not landed yet.
+   *
+   * That window is why the update asks for its row back. A PostgREST update that
+   * matches nothing is not an error — it reports success having changed nothing —
+   * so without this check a student who rated a course seconds after adding it
+   * offline would watch the chip fill in and then find it blank after a reload.
+   * Zero rows means "the enrolment is not there yet", and the outbox is exactly
+   * the right place for a write that has to wait for one: FIFO puts it behind the
+   * `course.add` it depends on.
+   */
+  async function setProficiency(courseId: string, level: Proficiency) {
+    if (!userId) return;
+    const current = byCourseId.get(courseId);
+    if (!current || current.proficiency === level) return;
+
+    setFormError(null);
+    setRatingCourseId(courseId);
+
+    const previous = userCourses;
+    const patch = (uc: UserCourseWithDetail) =>
+      uc.course_id === courseId ? { ...uc, proficiency: level } : uc;
+    setLocal(userCourses.map(patch));
+
+    const queue = async () => {
+      await enqueue(
+        'course.proficiency',
+        { course_id: courseId, proficiency: level },
+        userId
+      );
+      await refreshPending();
+    };
+
+    try {
+      if (isOnline) {
+        const { data, error } = await supabase
+          .from('user_courses')
+          .update({ proficiency: level })
+          .eq('user_id', userId)
+          .eq('course_id', courseId)
+          .select('user_course_id');
+        if (error) throw error;
+        if (!data || data.length === 0) await queue();
+      } else {
+        await queue();
+      }
+    } catch (error) {
+      try {
+        await queue();
+      } catch {
+        setLocal(previous);
+        setFormError(friendlyError(error));
+      }
+    } finally {
+      setRatingCourseId(null);
+    }
+  }
+
+  const canContinue =
+    (!requireAtLeastOne || userCourses.length > 0) &&
+    (!requireRatings || unrated.length === 0);
+
+  /**
+   * Named, not just counted, because the list is filtered by the search box: a
+   * course still missing its rating can be scrolled past or typed out of view, and
+   * a disabled button with nothing on screen to explain it is the one state a
+   * student cannot act on.
+   */
+  const unratedNote =
+    unrated.length === 0
+      ? null
+      : `Say how you are finding ${unrated
+          .map((uc) => uc.course?.course_code ?? 'this course')
+          .join(', ')}.`;
 
   return (
     <Screen
       title="Your courses"
       subtitle={
         subtitle ??
-        'Pick the courses you want study partners for. You can change these later.'
+        'Pick only the courses you want a study group for, then say how you are finding each one. You can change both later.'
       }
       scroll={false}
       footer={
-        <Button
-          label={footerLabel(userCourses.length)}
-          onPress={onDone}
-          disabled={!canContinue}
-        />
+        <>
+          {!!unratedNote && (
+            <Text style={styles.footerNote} accessibilityLiveRegion="polite">
+              {unratedNote}
+            </Text>
+          )}
+          <Button
+            label={footerLabel(userCourses.length)}
+            onPress={onDone}
+            disabled={!canContinue}
+          />
+        </>
       }
     >
       {showStepHeader && <StepHeader step={2} total={3} />}
@@ -222,39 +354,88 @@ export function CoursePicker({
           </Text>
         </View>
       ) : (
-        <View style={styles.list}>
+        <ScrollView
+          style={styles.list}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {filtered.map((course) => {
-            const selected = selectedIds.has(course.course_id);
+            const enrolment = byCourseId.get(course.course_id);
+            const selected = !!enrolment;
             const busy = busyCourseId === course.course_id;
+            const rating = ratingCourseId === course.course_id;
             return (
-              <Pressable
-                key={course.course_id}
-                onPress={() =>
-                  selected ? void removeCourse(course.course_id) : void addCourse(course)
-                }
-                disabled={busy}
-                style={[styles.row, selected && styles.rowSelected]}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected, busy }}
-                accessibilityLabel={`${course.course_code}, ${course.course_title}`}
-              >
-                <View style={styles.rowText}>
-                  <Text style={styles.code}>{course.course_code}</Text>
-                  <Text style={styles.title} numberOfLines={2}>
-                    {course.course_title}
-                  </Text>
-                </View>
-                {busy ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <View style={[styles.checkbox, selected && styles.checkboxOn]}>
-                    {selected && <Text style={styles.checkMark}>✓</Text>}
+              <View key={course.course_id}>
+                <Pressable
+                  onPress={() =>
+                    selected ? void removeCourse(course.course_id) : void addCourse(course)
+                  }
+                  disabled={busy || rating}
+                  style={[
+                    styles.row,
+                    selected && styles.rowSelected,
+                    selected && styles.rowAttached,
+                  ]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected, busy }}
+                  accessibilityLabel={`${course.course_code}, ${course.course_title}`}
+                >
+                  <View style={styles.rowText}>
+                    <Text style={styles.code}>{course.course_code}</Text>
+                    <Text style={styles.title} numberOfLines={2}>
+                      {course.course_title}
+                    </Text>
+                  </View>
+                  {busy ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <View style={[styles.checkbox, selected && styles.checkboxOn]}>
+                      {selected && <Text style={styles.checkMark}>✓</Text>}
+                    </View>
+                  )}
+                </Pressable>
+
+                {selected && (
+                  <View style={styles.rating}>
+                    <Text style={styles.ratingLabel}>
+                      How are you finding this course?
+                    </Text>
+                    {PROFICIENCY_CHOICES.map((level) => {
+                      const on = enrolment.proficiency === level;
+                      return (
+                        <Pressable
+                          key={level}
+                          onPress={() => void setProficiency(course.course_id, level)}
+                          disabled={busy || rating}
+                          style={[styles.option, on && styles.optionOn]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: on, busy: rating }}
+                          accessibilityLabel={`${PROFICIENCY_LABEL[level]}. ${PROFICIENCY_HINT[level]}`}
+                        >
+                          <View style={[styles.radio, on && styles.radioOn]}>
+                            {on && <View style={styles.radioDot} />}
+                          </View>
+                          <View style={styles.optionText}>
+                            <Text
+                              style={[styles.optionLabel, on && styles.optionLabelOn]}
+                            >
+                              {PROFICIENCY_LABEL[level]}
+                            </Text>
+                            <Text style={styles.hint}>{PROFICIENCY_HINT[level]}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                    <Text style={styles.ratingWhy}>
+                      Only used to mix the group, so somebody in it can explain the
+                      parts you are stuck on. Nobody sees your answer.
+                    </Text>
                   </View>
                 )}
-              </Pressable>
+              </View>
             );
           })}
-        </View>
+        </ScrollView>
       )}
     </Screen>
   );
@@ -271,8 +452,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.md,
   },
-  // No FlatList: the seeded list is short enough that virtualisation costs more
-  // than it saves on an entry-level device.
+  // A ScrollView rather than a FlatList: the seeded list is short enough that
+  // virtualisation costs more than it saves on an entry-level device. It does have
+  // to scroll, though — a picked course grows a rating block three options tall,
+  // so even a short list stops fitting once a couple are selected.
   list: { flex: 1 },
   row: {
     flexDirection: 'row',
@@ -287,6 +470,71 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   rowSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  // Square off the bottom of a picked row so it reads as one card with the rating
+  // block underneath it, rather than two unrelated things that happen to be close.
+  rowAttached: {
+    marginBottom: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
+  },
+  rating: {
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: colors.accent,
+    borderBottomLeftRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  ratingLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  ratingWhy: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    minHeight: MIN_TOUCH,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    marginBottom: spacing.sm,
+  },
+  optionOn: { borderColor: colors.primary, borderWidth: 2 },
+  optionText: { flex: 1, paddingLeft: spacing.sm },
+  optionLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  optionLabelOn: { color: colors.primary },
+  hint: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  radioOn: { borderColor: colors.primary },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
   rowText: { flex: 1, paddingRight: spacing.md },
   code: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   title: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
@@ -314,4 +562,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginBottom: spacing.sm },
+  footerNote: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    lineHeight: 20,
+  },
 });

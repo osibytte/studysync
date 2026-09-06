@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CacheKeys, cacheReadData, cacheWrite } from '@/lib/cache';
+import { asProficiency } from '@/lib/groupRules';
 import { supabase } from '@/lib/supabase';
 import type { UserCourseWithDetail } from '@/types/database';
 
@@ -52,7 +53,8 @@ export function useUserCourses(userId: string | null): State {
         user_id,
         course_id,
         availability,
-        matching_pref,
+        proficiency,
+        applied_at,
         created_at,
         course:courses (
           course_id,
@@ -79,8 +81,11 @@ export function useUserCourses(userId: string | null): State {
       user_id: row.user_id,
       course_id: row.course_id,
       availability: row.availability,
-      // Older cached rows predate 0007; fall back to the column's own default.
-      matching_pref: row.matching_pref ?? 'system',
+      // Both null for an enrolment added before 0020, and null is the honest
+      // answer for each: nobody has rated it, and nobody has applied. The rating
+      // chips read a null as "not answered yet" rather than as a middle band.
+      proficiency: asProficiency(row.proficiency),
+      applied_at: row.applied_at ?? null,
       created_at: row.created_at,
       course: row.course,
     }));

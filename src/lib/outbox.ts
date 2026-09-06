@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { proposeSession, respondToSession, sendMessage } from './chat';
-import { createGroup, leaveGroup, setMatchingPref } from './groups';
+import { createGroup, leaveGroup } from './groups';
 import { makeActionId } from './ids';
 import { supabase, isNetworkError } from './supabase';
-import type { MatchingPref, SessionResponseValue } from '@/types/database';
+import type { SessionResponseValue } from '@/types/database';
 
 /**
  * Offline write queue.
@@ -45,17 +45,26 @@ const DEAD_KEY = 'studysync:outbox:dead:v1';
 /**
  * Actions the queue knows how to replay. Extended as later stages land.
  *
- * Stage 2 adds only the three group actions that are useful offline: creating a
- * group, leaving one, and changing how you want to be matched on a course. The
- * rest (invite, respond, approve) are deliberately online-only — each one
- * depends on server state that may have changed while the device was offline (a
- * group filling up, an invitation being cancelled), so queueing them would
- * mostly produce dead-lettered actions and a confusing optimistic UI.
+ * Stage 2 adds only the two group actions that are useful offline: creating a
+ * group and leaving one. The rest (invite, respond, approve) are deliberately
+ * online-only — each one depends on server state that may have changed while the
+ * device was offline (a group filling up, an invitation being cancelled), so
+ * queueing them would mostly produce dead-lettered actions and a confusing
+ * optimistic UI.
  *
- * `matching.pref` is queueable on the opposite reasoning: it hands out no seat
- * and nobody else has to answer it. It is a private, last-write-wins setting
- * that only takes effect the next time an admin runs batch matching, so landing
- * it minutes later is honoured exactly as if it had landed at once.
+ * `matching.request` — applying to be matched — is online-only for a sharper
+ * version of the same reason, and it is worth naming because 0020 replaced a
+ * queueable action with one that cannot be: the RPC's answer depends on whether a
+ * registration window is open AT THE MOMENT IT RUNS. An application queued while
+ * the window was open and replayed after it shut would be refused, with the
+ * student having already been told they were in the pool and no screen left to
+ * correct it. It also cannot be withdrawn, so a wrong optimistic yes is not
+ * something the student can undo.
+ *
+ * `course.proficiency` — the same migration's other half — IS queueable, and the
+ * contrast is the whole test: a self-rating is a private, last-write-wins field on
+ * the student's own row that nothing reads until a run happens. Landing it minutes
+ * late is indistinguishable from landing it at once.
  *
  * Stage 3 adds three more, and the test is the same one: does landing late
  * change what the action means?
@@ -92,9 +101,9 @@ export type OutboxActionType =
   | 'course.add'
   | 'course.remove'
   | 'availability.set'
+  | 'course.proficiency'
   | 'group.create'
   | 'group.leave'
-  | 'matching.pref'
   | 'chat.send'
   | 'session.propose'
   | 'session.respond';
@@ -222,7 +231,6 @@ function isDuplicateKey(error: unknown): boolean {
 const SELF_LEDGERED: readonly OutboxActionType[] = [
   'group.create',
   'group.leave',
-  'matching.pref',
   // The Stage 3 RPCs claim it the same way, under the action names above:
   // send_message claims 'chat.send', propose_session 'session.propose',
   // respond_to_session 'session.respond' (0014, 0016). Leaving any of them out
@@ -316,6 +324,29 @@ async function applyAction(action: OutboxAction): Promise<void> {
     }
 
     /**
+     * Keyed on `course_id`, NOT `user_course_id`, and that is the whole reason
+     * this action can be queued at all. A course added offline has no
+     * server-issued `user_course_id` yet — the optimistic row carries a temporary
+     * one — so an update filtered on it would match nothing and silently succeed.
+     * `(user_id, course_id)` is unique on the table, so this names exactly the
+     * same row without needing the id, and FIFO ordering guarantees the
+     * `course.add` ahead of it has already landed.
+     */
+    case 'course.proficiency': {
+      const { course_id, proficiency } = action.payload as {
+        course_id: string;
+        proficiency: number;
+      };
+      const { error } = await supabase
+        .from('user_courses')
+        .update({ proficiency })
+        .eq('user_id', action.userId)
+        .eq('course_id', course_id);
+      if (error) throw error;
+      return;
+    }
+
+    /**
      * The group id was generated on the device when the student tapped Create,
      * so the optimistic card and the row Postgres finally writes are the same
      * object — nothing has to be reconciled when this lands.
@@ -342,20 +373,6 @@ async function applyAction(action: OutboxAction): Promise<void> {
     case 'group.leave': {
       const { group_id } = action.payload as { group_id: string };
       await leaveGroup(group_id, action.id);
-      return;
-    }
-
-    /**
-     * Last-write-wins. If two pref changes for the same course are queued, FIFO
-     * means the later one is applied last, which is the answer the student left
-     * the screen with.
-     */
-    case 'matching.pref': {
-      const { course_id, pref } = action.payload as {
-        course_id: string;
-        pref: MatchingPref;
-      };
-      await setMatchingPref(course_id, pref, action.id);
       return;
     }
 
@@ -416,8 +433,8 @@ async function applyAction(action: OutboxAction): Promise<void> {
     }
 
     /**
-     * Last-write-wins on one row, like matching.pref: two queued answers for the
-     * same session apply in order and the later one stands.
+     * Last-write-wins on one row, like course.proficiency: two queued answers for
+     * the same session apply in order and the later one stands.
      */
     case 'session.respond': {
       const { session_id, response } = action.payload as {

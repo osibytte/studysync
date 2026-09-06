@@ -2,11 +2,11 @@
 
 Study-partner matching for University of Ibadan students. React Native (Expo) + Supabase.
 
-Four of a five-stage build are complete, and the fifth is half done. A student can register, sign in, set their name and department, pick courses, and set a weekly availability grid (**Stage 1**). They can be matched into a study group, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests (**Stage 2**). Inside a group there is a timeline: chat, plus study times proposed, agreed and cancelled in it (**Stage 3**), and files shared from the same timeline into a private bucket, with their own tab (**Stage 4**). And the phone now rings **30 minutes before a study time the group agreed on**, from the OS rather than a server, so it works with no signal and the app closed (**Stage 5**, its local half).
+Four of a five-stage build are complete, and the fifth is half done. A student can register, sign in, set their name and department, pick the courses they want a study group for, rate how well they understand each one, and set a weekly availability grid (**Stage 1**). They can apply to be matched while the registration window is open, browse the open groups on their courses, create their own, invite people, and answer invitations and join requests (**Stage 2**). Inside a group there is a timeline: chat, plus study times proposed, agreed and cancelled in it (**Stage 3**), and files shared from the same timeline into a private bucket, with their own tab (**Stage 4**). And the phone now rings **30 minutes before a study time the group agreed on**, from the OS rather than a server, so it works with no signal and the app closed (**Stage 5**, its local half).
 
 What is left of Stage 5 is everything with a server in it: the notification ledger, a preferences screen and in-app inbox, and remote push for chat, file and invitation activity — that last part is the only thing in the project needing an EAS development build.
 
-Profile edits, creating a group, leaving a group, choosing whether a course opts into automatic matching, sending a message, proposing a study time and answering one all work offline and sync when the connection returns. `HANDOFF.md` is the full engineering record; this file is orientation and setup.
+Profile edits, creating a group, leaving a group, rating a course, sending a message, proposing a study time and answering one all work offline and sync when the connection returns. Applying to be matched is deliberately online-only, for the reason given under [Stage 2](#stage-2--group-formation). `HANDOFF.md` is the full engineering record; this file is orientation and setup.
 
 ## What you need
 
@@ -37,7 +37,7 @@ Supabase dashboard → SQL Editor → New query. Run every file **in numerical o
 2. `supabase/migrations/0002_stage1_rls.sql` — row level security policies
 3. `supabase/seed/0003_seed_courses.sql` — placeholder courses
 
-…then `0004` through `0019` from `supabase/migrations/`. The seed took the number `0003`, so the migrations skip it; nothing is missing.
+…then `0004` through `0020` from `supabase/migrations/`. The seed took the number `0003`, so the migrations skip it; nothing is missing.
 
 Order matters throughout, and migrations are **forward-only** — an applied file is never edited, which is why a few of them still carry comments naming things a later one dropped or renamed. `0002` adds policies to tables `0001` creates and the seed inserts into them; `0005` adds policies to `0004`'s tables; `0018` fixes a gap in `0017`'s Storage policies. Filenames record when a file was written rather than which stage owns it, so `0017_stage3_materials.sql` and `0018_stage3_storage_readback.sql` are in fact Stage 4's backend.
 
@@ -73,7 +73,7 @@ Scan the QR with Expo Go. If you change `.env`, restart with `npx expo start --c
 npm test
 ```
 
-432 tests in 8 suites. The availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names), profile validation, the compatibility scorer, the group vocabulary, the chat and materials rules, and the notification rules. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
+472 tests in 8 suites. The availability bitmask (encode/decode round-trip, day/slot bit layout, overlap counting, the zero-overlap edge case the spec names), profile validation, the compatibility scorer and its proficiency term, the registration-window and apply-to-be-matched rules, the group vocabulary, the chat and materials rules, and the notification rules. The bit-layout tests are the important ones: if the TypeScript and SQL disagree about which bit is which, matching silently compares the wrong slots and nothing throws.
 
 **A green suite cannot see a bundling failure**, because `jest-expo` resolves modules through its own preset and never reads `metro.config.js` — which is how this project once had 325 passing tests and an app that would not bundle on either platform. `HANDOFF.md` §4 has the four-part health check, including how to ask Metro for each platform's bundle directly.
 
@@ -87,11 +87,11 @@ Time yourself against the 5-minute onboarding target:
 
 1. Create an account
 2. Enter name and department
-3. Pick two or three courses
+3. Pick two or three courses, and rate each one — onboarding will not continue until every picked course has a band
 4. Set availability — tap a day name to fill the whole column
 5. Land on home and confirm it reflects your courses and availability
 
-Then, for the later stages: open a group, send a message, propose a study time **at least 31 minutes out**, answer *yes* (the one tap that asks for notification permission), and share a file. `HANDOFF.md` §7 walks each of these as a numbered pathway, including what is still unproven on a real device.
+Then, for the later stages: apply to be matched on a course (needs an open registration window — see Stage 2 below), open a group, send a message, propose a study time **at least 31 minutes out**, answer *yes* (the one tap that asks for notification permission), and share a file. `HANDOFF.md` §7 walks each of these as a numbered pathway, including what is still unproven on a real device.
 
 ### Offline behaviour
 
@@ -140,15 +140,17 @@ If you see rows, RLS is not doing its job. Check that `0002_stage1_rls.sql` ran 
 
 ## Stage 2 — Group Formation
 
-The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). `0009` then removed topics, `0010` added the four read RPCs the client screens need, `0011` added the course-enrolment gate to the five write paths that hand out or promise a membership, and `0012` made the shared-time answer require every member while a group is small. Run them in order after Stage 1's `0001`–`0003`.
+The database layer is complete — migrations `0004`–`0007` add the group tables, SELECT-only RLS, the SECURITY DEFINER write RPCs (all group mutations go through these, never a direct client write), a daily `pg_cron` lifecycle sweep, and the batch-matching pool column plus its operator write path (`0007`, described below). `0009` then removed topics, `0010` added the four read RPCs the client screens need, `0011` added the course-enrolment gate to the five write paths that hand out or promise a membership, `0012` made the shared-time answer require every member while a group is small, and `0020` added the self-rated proficiency band, the apply-to-be-matched pool and the registration window that gates it (retiring `0007`'s `matching_pref`). Run them in order after Stage 1's `0001`–`0003`.
 
 The compatibility score is a weighted sum, normalised to `[0, 1]`:
 
 ```
-score = 0.8 · scheduleOverlap + 0.2 · groupFillBonus
+score = 0.65 · scheduleOverlap + 0.25 · proficiencyMix + 0.10 · groupFillBonus
 ```
 
-Matching is by **course + availability**: course is the grouping key (only students enrolled in the same course are ever compared), and schedule overlap is the real compatibility signal — you have to actually be able to meet — with a small nudge toward filling a near-complete group. Schedule overlap normalises against the *more constrained* side, not the maximum, so a time-poor student is not punished for it. See `src/lib/matching.ts`.
+Matching is by **course + availability + self-rated proficiency**: course is the grouping key (only students enrolled in the same course are ever compared), and schedule overlap is still the dominant signal — you have to actually be able to meet — with the students' own understanding of the course as a second term and a small nudge toward filling a near-complete group. Schedule overlap normalises against the *more constrained* side, not the maximum, so a time-poor student is not punished for it. See `src/lib/matching.ts`.
+
+**The proficiency term rewards a mix, not a match.** One band apart scores 1.0, identical bands 0.5, and the extremes (struggling with fairly confident) 0.75 — so a group where somebody can explain and somebody needs the explanation beats a room of people equally stuck, while the widest gap is discouraged rather than forbidden. It is a term and not a filter: it can never drag a score below `0.125`, so a promising mix cannot rescue a group that can never meet, and an unrated legacy enrolment falls back to the middle band and ranks on schedule alone. A separate whole-group rule, `isolatedByProficiency`, catches the one shape no pairwise term can see — a single student at one extreme with nobody in the middle band to bridge to — and `partitionIntoGroups` tries one swap to fix it before letting the group stand.
 
 ### Pathway One — the `find-group` matching function
 
@@ -191,9 +193,11 @@ Expect a JSON body with `requester`, a ranked `groups` array, and a ranked `sugg
 supabase functions deploy run-batch-matching --no-verify-jwt
 ```
 
-**Who's in the pool.** Every student enrolled in the course with `user_courses.matching_pref = 'system'` (the default on enrolment), minus anyone already in a group on that course. A student who would rather organise their own group sets `matching_pref = 'self_organized'` — from the "How you get matched" screen, which calls the `set_matching_pref` RPC in `0007` — and is left out: "the self-matching students are not among." So is anyone who has already self-organised, since group membership excludes them too.
+**Who's in the pool.** Every student who has *applied* on that course — `user_courses.applied_at is not null` — minus anyone already in a group on it. Nothing puts a student in the pool on their behalf: `0020` retired `0007`'s opt-out `matching_pref` in favour of an explicit application from the "Apply to be matched" screen, which only works while a registration window is open. Being matched is not stored anywhere, it is derived from group membership — so leaving a system-formed group returns the student to the pool for the next run — and `applied_at` is never cleared, because an application cannot be withdrawn.
 
-**How it groups.** Group size is a random target of 3–6, per the product decision. Two rules keep the tail humane: a remainder of 2–6 becomes one final group (a pair is allowed), and a target that would strand exactly one student is shrunk by one. So any pool of ≥ 2 is fully grouped, and only a lone student (a pool of exactly one) comes back in `waiting`, to be picked up on the next run. Each group is written through the `create_system_group` RPC (`0007`) — service-role-only, the sole write path, mirroring how the client's own mutations go through definer RPCs.
+> ⚠️ **The deployed copy of this function still filters on `matching_pref`.** It must be redeployed from the branch that carries `0020`, once `0020` is applied, or a run will find an empty pool.
+
+**How it groups.** Group size is a random target of 3–6, per the product decision. Two rules keep the tail humane: a remainder of 2–6 becomes one final group (a pair is allowed), and a target that would strand exactly one student is shrunk by one. So any pool of ≥ 2 is fully grouped, and only a lone student (a pool of exactly one) comes back in `waiting`, to be picked up on the next run. Each formed group is then checked for a single student stranded at one proficiency extreme, and one swap is attempted before it is accepted (above). Each group is written through the `create_system_group` RPC (`0007`, extended by `0020`) — service-role-only, the sole write path, mirroring how the client's own mutations go through definer RPCs — which also composes each new member's `group_matched` notification in SQL, inside the same transaction that creates the group.
 
 Try it with `dry_run` first — it runs the full partition and returns the proposed groups **without writing anything** (needs the Supabase CLI and Deno, as with `find-group`):
 
@@ -217,9 +221,13 @@ The response is a run summary: `pool_size`, the `groups` formed (each with its m
 
 ### The client screens
 
-`app/(app)/groups/` holds the Stage 2 UI: the list of your groups, create, browse (`discover`), matching (`match`), invitations, how you get matched (`matching`), a group detail screen, and invite-a-student. `src/lib/groups.ts` is one typed wrapper per RPC; `src/lib/groupRules.ts` holds the status vocabulary, capacity phrasing and can-I-do-this predicates the screens share, unit-tested against the SQL rules they mirror.
+`app/(app)/groups/` holds the Stage 2 UI: the list of your groups, create, browse (`discover`), suggestions (`match`), invitations, apply to be matched (`matching`), a group detail screen, and invite-a-student. `src/lib/groups.ts` is one typed wrapper per RPC; `src/lib/groupRules.ts` holds the status vocabulary, capacity phrasing, the proficiency and registration-window wording, and the can-I-do-this predicates the screens share, unit-tested against the SQL rules they mirror.
 
-**"How you get matched" is per course, not per student**, because `matching_pref` is a column on `user_courses` (`0007`): a student may want placing on the course they are struggling with and left alone on the one where they already have friends. The setting changes what a *batch matching run* does and nothing else — suggestions, browsing, requests and invitations work identically either way, and the hints say so, because "opt out" otherwise reads as "opt out of study groups". The screen also mirrors the run's own pool exclusion (`inMatchingPool`), so a course you are opted in on but already grouped on says it will be passed over rather than quietly doing nothing.
+**"Apply to be matched" is per course, not per student**, because the pool is a column on `user_courses` (`applied_at`, `0020`): a student may want placing on the course they are struggling with and left alone on the one where they already have friends. The screen resolves each enrolment to one of five steps — grouped, applied, needs a rating, needs free time, ready — and shows only that step's sentence, so there is never a disabled button without the reason next to it. Two properties are worth knowing before you test it. **An application cannot be withdrawn**, including by dropping the course: a trigger in `0020` refuses to delete an applied enrolment, and the button says so before the tap. And **being matched is derived, not stored** — leaving a system-formed group puts you back in the pool with nothing to re-submit.
+
+**The registration window gates that one button and nothing else.** `matching_windows` (`0020`) holds one global period an operator opens and closes with service-role RPCs; students read it through `matching_window_state()`, which returns the *server's* clock alongside the window, because a phone whose clock is a day out would otherwise read an open deadline as "Yesterday" under a live button. When no period is scheduled the banner says what still works — browse, ask to join, wait to be invited — since a closed window is not a closed app.
+
+**Applying is online-only, and it is the one action where that is not a convenience call.** `request_matching`'s answer depends on whether a window is open *at the moment it runs*. An application queued while the window was open and replayed after it shut would be refused, with the student already told they were in the pool, no way to withdraw, and no screen left to correct it. Rating a course is the deliberate contrast and *is* queued: a private, last-write-wins field on the student's own row that nothing reads until a run happens.
 
 **Migration `0010` exists because of a name-resolution gap.** Stage 1's RLS on `users` is own-row only, which is the right default — a student must not be able to enumerate the student body. Stage 2's policies let a member read `group_members` (ids and roles) and their own invitations, but not the *names* behind those ids, so the roster and invitation screens had nothing to render. Widening the `users` policy would have fixed the screens and broken the privacy posture. Instead `0010` follows the precedent `search_students` already set: four SECURITY DEFINER `stable` reads, each gated on an explicit membership check, each returning **name and department only** — `group_members_detail`, `group_common_availability`, `my_invitations`, `group_join_requests`.
 
@@ -227,9 +235,9 @@ The response is a run summary: `pool_size`, the `groups` formed (each with its m
 
 **Migration `0012` makes "when you can all meet" mean *all* of you while a group is small.** `0010` marked a slot as shared when at least half the members were free then (`free >= ceil(n/2)`), which is right for a group of six — insisting on unanimity there usually returns nothing — and wrong for a group of two, where the threshold works out to 1 and the heading ends up describing a *union*. Measured live before the fix, with two members free at `1100110011001100110000000000` and `1100000011000000110011110000`, the group's grid came back `1100110011001100110011110000`: every slot either of them could make, presented as the time they can meet. Since every group begins at one or two members, that was the first thing most students would have read. `0012` sets the threshold to `n` at three members or fewer and keeps `ceil(n/2)` from four up. The step at four is deliberate rather than a smooth curve: two or three people can genuinely all show up, and a fourth is where holding out for unanimity starts costing the group more meetings than it saves. The RPC now returns `members_counted` and `meet_threshold` alongside the mask, and the screen names the rule it was given — "6 slots where all 2 of you are free" against "4 slots where at least 3 of 5 are free" — because the count the SQL divides by is the members enrolled in the *group's course*, which is smaller than the roster when someone has dropped it, so the client cannot re-derive the threshold from what it can see. The TypeScript scorer deliberately did **not** change with it: an intersection there would score most young groups 0 on schedule overlap and bury exactly the groups that need members. It was called `groupCommonAvailability` too, which made a rule difference look like drift, so it is now `groupScheduleProfile` in `src/lib/availability.ts` — different question, different name, and a unit test that fails if someone "fixes" it into agreeing with the SQL.
 
- Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting and matching are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id. `matching.pref` is safe on the opposite reasoning: it hands out no seat, nobody has to answer it, and it only takes effect the next time an operator runs batch matching — so a change that lands minutes later is honoured in full.
+ Asking to join, answering an invitation, approving a request, renaming, toggling discoverability, archiving, removing a member, inviting, applying to be matched and browsing suggestions are online-only, and the screens say so rather than silently queueing. An action that hands out one of a finite number of seats, or that another person has to answer, cannot honestly be promised for later. Create and leave are safe because the group id is generated on the device, so the optimistic card and the eventual row share one id. `course.proficiency` is safe on the opposite reasoning: it hands out no seat, nobody has to answer it, and nothing reads it until a matching run happens — so a rating that lands minutes later is honoured in full.
 
-**Verified against the live project, 2026-09-05.** Every Stage 2 RPC was driven with two throwaway accounts over PostgREST using real user JWTs — the same wire supabase-js uses, so argument names, return shapes, table grants and RLS were all under test. Both pathways end to end, the creator-only refusals, an idempotent replay of `create_group`, disband-on-empty, both hooks' embedded selects, and `find-group`'s first real caller all behaved as written. `0011` was then verified the same way: each of the five gates refused with its own message, a refused `create_group` left no `groups` row behind (the raise rolls the ledger claim back with it), approving a requester who had since dropped the course and accepting an invitation after dropping were both refused while *declining* still worked, and `anon` cannot call `is_enrolled` at all. `set_matching_pref` was checked for the property its offline queueing rests on — a replay under the same `p_client_action_id` is a no-op even with the opposite value, a fresh id applies, and an invalid preference raises without leaving a ledger row, so a retry is possible. `0012` was verified on a four-member group built one member at a time, with the member masks chosen so each threshold produces a different answer: at two members the mask is now the intersection `1100000011000000110000000000` where `0010` returned the union, three members requires all three, the fourth restores the majority (threshold 2), a member who drops the course stops being counted at all (`members_counted` 3 of a roster of 4, threshold 3), a group with no enrolled members returns an empty mask with both numbers 0, and `anon` gets `401` / `42501 permission denied for function` rather than a mask. All test rows and users were deleted afterwards. **The UI has since been driven on a real iPhone (2026-09-05):** sign-in, onboarding, group creation and chat all behaved. **What a finger still has not touched:** sharing a file (the multipart upload has been read but never run), Realtime between two phones, the offline queue draining after a genuine disconnect, and the 30-minute alarm firing in airplane mode. `HANDOFF.md` §7 has a numbered walkthrough for each.
+**Verified against the live project, 2026-09-05.** Every Stage 2 RPC was driven with two throwaway accounts over PostgREST using real user JWTs — the same wire supabase-js uses, so argument names, return shapes, table grants and RLS were all under test. Both pathways end to end, the creator-only refusals, an idempotent replay of `create_group`, disband-on-empty, both hooks' embedded selects, and `find-group`'s first real caller all behaved as written. `0011` was then verified the same way: each of the five gates refused with its own message, a refused `create_group` left no `groups` row behind (the raise rolls the ledger claim back with it), approving a requester who had since dropped the course and accepting an invitation after dropping were both refused while *declining* still worked, and `anon` cannot call `is_enrolled` at all. `set_matching_pref` was checked for the property its offline queueing rests on — a replay under the same `p_client_action_id` is a no-op even with the opposite value, a fresh id applies, and an invalid preference raises without leaving a ledger row, so a retry is possible. (**That RPC no longer exists.** `0020` dropped it along with `matching_pref`; the queued action it backed is now `course.proficiency`, and nothing in `0020` has been verified live yet, because it has not been applied.) `0012` was verified on a four-member group built one member at a time, with the member masks chosen so each threshold produces a different answer: at two members the mask is now the intersection `1100000011000000110000000000` where `0010` returned the union, three members requires all three, the fourth restores the majority (threshold 2), a member who drops the course stops being counted at all (`members_counted` 3 of a roster of 4, threshold 3), a group with no enrolled members returns an empty mask with both numbers 0, and `anon` gets `401` / `42501 permission denied for function` rather than a mask. All test rows and users were deleted afterwards. **The UI has since been driven on a real iPhone (2026-09-05):** sign-in, onboarding, group creation and chat all behaved. **What a finger still has not touched:** sharing a file (the multipart upload has been read but never run), Realtime between two phones, the offline queue draining after a genuine disconnect, and the 30-minute alarm firing in airplane mode. `HANDOFF.md` §7 has a numbered walkthrough for each.
 
 ## Stage 3 — the group timeline
 
@@ -257,6 +265,8 @@ The rule most likely to look like a bug: **a session must start at least 31 minu
 
 **Built, and the reason the sender is safe to run twice:** `0019_stage5_notifications.sql`, the delivery ledger. It stores a row per thing a student was *told*, not per thing that happened, because you cannot enforce the `daily_cap` they set without counting deliveries — and "have we already said this?" is not answerable from the messages, files and sessions themselves. A unique `(user_id, dedupe_key)` index turns a retried or double-invoked run into a conflict the writer swallows instead of a second banner, and bucketing a period into that key is also how "at most once per fortnight" works with no cooldown table anywhere. Chat is watermarked rather than row-per-message: one digest row per group per run ("4 new messages in BIO 201"), so the table grows with how often the sender runs and not with how chatty a group is. The 30-minute alarm writes nothing here, deliberately — a phone in airplane mode could not, which is the whole point of it being local.
 
+`0020` then added the one notification kind composed entirely in SQL: **`group_matched`**, written by `create_system_group` inside the transaction that forms the group. It is there because being placed in a study group is the one thing a student is *waiting* to hear, and it happens while the app is closed — an operator runs the batch, not the student. Everything else is composed in TypeScript, which is why `group_matched` is the one kind with no arm in `subjectFor`.
+
 **Not built yet:** a preferences screen and in-app inbox over that ledger, then remote push for chat, file, session and invitation activity — plus the four study nudges (a study time one yes short, a slot the whole group is free, a group gone quiet, an invitation never answered). Every one of those is capped, quiet-hours-silenced and individually switchable, and **none is ever urgent**: a nudge that ignores a student's stated limit is how notifications get switched off at the OS level, taking the study alarm they actually wanted with them. The remote half is what the EAS development build is for.
 
 ## Layout
@@ -277,9 +287,9 @@ src/
                           FileCard, Composer
   context/                AuthContext, NetworkContext
   hooks/                  useCourses, useUserCourses, useMyGroups, useDiscover,
-                          useGroupDetail, useInvitations, useMessages,
-                          useSessionAttendees, useMaterials, useUnread,
-                          useReminders
+                          useGroupDetail, useInvitations, useMatchingWindow,
+                          useMessages, useSessionAttendees, useMaterials,
+                          useUnread, useReminders
   lib/
     supabase.ts           client + error mapping
     availability.ts       bitmask encoding, overlap scoring, group common grid
@@ -303,7 +313,7 @@ src/
     database.ts           schema types (Stages 1–4 tables)
     matching.ts           find-group + batch-matching response contracts
 supabase/
-  migrations/             schema + RLS + RPCs (0001–0019; no 0003, that is the seed)
+  migrations/             schema + RLS + RPCs (0001–0020; no 0003, that is the seed)
   seed/                   placeholder courses
   functions/
     _shared/              mirrored availability.ts + matching.ts
@@ -315,7 +325,11 @@ supabase/
 
 ## Decisions worth knowing
 
-**Matching is by course and availability.** Course is the grouping key — only students enrolled in the same course are ever compared — and the weekly availability grid is the compatibility signal. There is no separate "topics" concept: the course *is* the subject.
+**Matching is by course, availability and a self-rated proficiency band.** Course is the grouping key — only students enrolled in the same course are ever compared — the weekly availability grid is the dominant compatibility signal, and the student's own answer to "how is this course going" is the second. There is no separate "topics" concept: the course *is* the subject.
+
+**A student picks only the courses they want a study group for**, and nothing puts them in a matching pool on their behalf. They apply, per course, while a registration window is open, and then wait for the run — an application cannot be withdrawn, and the trigger in `0020` closes the back door of dropping the course to escape it. The window gates that one action and nothing else: with no period scheduled a student can still browse, ask to join, or be invited.
+
+**The proficiency band is three options, not a number.** "Struggling", "Getting by", "Fairly confident" (stored 1/2/3). A 1–10 scale invites false precision on a self-assessment, and the scorer only ever reasons about the *gap* between two answers, which needs bands rather than points. It is private — a footnote on the picker says so — because a rating other students could read would be answered strategically rather than honestly.
 
 **Availability is a 7×4 grid stored as `bit(28)`.** Overlap is `bit_count(a & b)`, one cheap operation per candidate. Bit index is `day * 4 + slot`, bit 0 leftmost. The TypeScript in `src/lib/availability.ts` and the SQL `availability_overlap()` must agree on this — change one, change both.
 
@@ -338,11 +352,13 @@ Found during spec review; the feature logic requires them:
 
 ## Known gaps at this stage
 
+**`0019` and `0020` are written but not yet applied to the live project.** Everything in the repo compiles and passes against them; the database does not have them. Run `supabase db push` (or paste them into the SQL editor in order) before testing the notification ledger, the proficiency band, applying to be matched, or the registration window — and redeploy `run-batch-matching` afterwards, since the deployed copy still reads the pool column `0020` retires.
+
 Availability edits apply to every enrolled course at once. Intentional for now, per above.
 
 **Migrations `0010` and `0012` still name a function that no longer exists.** Their comments point at `groupCommonAvailability()` in `src/lib/availability.ts`, which is now `groupScheduleProfile`. Applied migrations are never rewritten — the same reason `0001`–`0008` still reference the topics tables that `0009` dropped — so the stale name is the documented cost of forward-only history, not an oversight.
 
-**Closed since the first draft of this file:** the enrolment gap in the write RPCs (`0011`), the shared-time rule that called two people a majority of two (`0012`), the missing `set_matching_pref` screen (`app/(app)/groups/matching.tsx`), and the two functions that shared a name while applying different rules (the TS scorer is now `groupScheduleProfile`) — all described in the Stage 2 section.
+**Closed since the first draft of this file:** the enrolment gap in the write RPCs (`0011`), the shared-time rule that called two people a majority of two (`0012`), and the two functions that shared a name while applying different rules (the TS scorer is now `groupScheduleProfile`) — all described in the Stage 2 section. The "how you get matched" screen that once filled `app/(app)/groups/matching.tsx` is gone rather than fixed: `0020` replaced the opt-out preference behind it with an explicit application, and that route is now "Apply to be matched".
 
 ## Before the pilot
 

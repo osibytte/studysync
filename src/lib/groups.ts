@@ -6,7 +6,7 @@ import type {
   GroupMemberDetailRow,
   InvitationDetailRow,
   JoinRequestDetailRow,
-  MatchingPref,
+  MatchingWindowState,
   StudentSearchRow,
 } from '@/types/database';
 import type { FindGroupResponse } from '@/types/matching';
@@ -30,9 +30,11 @@ import type { FindGroupResponse } from '@/types/matching';
  *      check `error` silently does nothing. These throw, so a caller's try/catch
  *      is the single path.
  *
- * Every function here is online-only by itself. Offline capability for the three
- * actions that have it (`group.create`, `group.leave`, `matching.pref`) lives in
- * outbox.ts, which calls back into these with the queued action's id.
+ * Every function here is online-only by itself. Offline capability for the two
+ * actions that have it (`group.create`, `group.leave`) lives in outbox.ts, which
+ * calls back into these with the queued action's id.
+ *
+ * `requestMatching` is deliberately NOT one of them — see its own comment.
  */
 
 /** Thrown for a failed RPC. Screens map it with friendlyError(). */
@@ -200,30 +202,45 @@ export async function respondJoinRequest(
 }
 
 /**
- * Opt this course in or out of admin-initiated batch matching.
+ * Apply to be matched on one course: joins the pool for the next matching run.
  *
- * Takes an optional `clientActionId` for the same reason createGroup does: this
- * is the third action the outbox can replay, so the queued id has to survive
- * into the RPC or the replay would claim a fresh ledger row.
+ * Returns the `applied_at` the server recorded. Idempotent — applying twice
+ * returns the first timestamp rather than failing — and there is NO withdrawal,
+ * by product decision: once you have asked to be matched you wait for the run.
+ *
+ * ONLINE ONLY, and the one write in this file that takes no client action id.
+ * Queueing it offline would be a promise the app cannot keep: the RPC's answer
+ * depends on whether a registration window is open at the moment it runs, so an
+ * action replayed an hour later could be refused with nothing on screen to refuse
+ * it to. A student needs to see "you are in the pool" the instant they tap, which
+ * means a live call. (`applied_at` is server-set for the same reason: a device
+ * clock cannot be allowed to decide who applied before the window shut.)
  */
-export async function setMatchingPref(
-  courseId: string,
-  pref: MatchingPref,
-  clientActionId?: string
-): Promise<void> {
-  unwrap(
-    await supabase.rpc('set_matching_pref', {
-      p_client_action_id: clientActionId ?? makeActionId(),
-      p_course_id: courseId,
-      p_pref: pref,
-    })
+export async function requestMatching(courseId: string): Promise<string> {
+  const appliedAt = unwrap(
+    await supabase.rpc('request_matching', { p_course_id: courseId })
   );
+  return appliedAt as string;
 }
 
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
+/**
+ * The current registration period, plus the server's clock.
+ *
+ * `server_now` comes back with it so the screen dates the window against the
+ * server rather than the phone. See `windowBanner` in groupRules.ts for why that
+ * matters. Returns null only if the RPC answers with no row at all, which would
+ * be a deployment fault rather than "no window" — no window is a row with
+ * `window_id` null.
+ */
+export async function matchingWindowState(): Promise<MatchingWindowState | null> {
+  const data = unwrap(await supabase.rpc('matching_window_state'));
+  const rows = (data ?? []) as MatchingWindowState[];
+  return rows.length > 0 ? rows[0] : null;
+}
 /** Discoverable groups on a course, excluding ones the caller is already in. */
 export async function discoverGroups(
   courseId: string,

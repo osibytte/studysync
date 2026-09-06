@@ -19,15 +19,24 @@
 //     supabase functions deploy run-batch-matching --no-verify-jwt
 //
 // THE POOL — who gets matched:
-//   user_courses on this course with matching_pref = 'system' (the default),
-//   minus anyone already in a group on this course. Students who opted out
-//   (matching_pref = 'self_organized') or who already self-organised into a
-//   group are excluded — "the self-matching students are not among".
+//   user_courses on this course with applied_at set — the students who asked to
+//   be matched during a registration window, via the request_matching RPC
+//   (migration 0020) — minus anyone already in a group on this course. Students
+//   who never applied, or who already self-organised into a group, are excluded:
+//   "the self-matching students are not among".
+//
+//   Being in the pool is one timestamped fact, not a preference. There is no
+//   withdrawal, and matched state is DERIVED from group membership rather than
+//   stored — so a student who leaves a system group re-enters the pool and the
+//   next run picks them up.
 //
 // It reuses the SAME scoring the client and find-group use (the mirrored
 // _shared/matching.ts) via partitionIntoGroups, then writes each group through
-// the service-role-only create_system_group RPC (migration 0007) — the only
-// write path; this function never inserts into group tables directly.
+// the service-role-only create_system_group RPC (migration 0007, rewritten in
+// 0020) — the only write path; this function never inserts into group tables
+// directly. That RPC also writes each new member's 'group_matched' notification
+// in the same transaction, so a run that dies here can never leave a student
+// placed in a group and never told.
 //
 // Unlike find-group there is no privacy masking: the caller IS the trusted
 // operator (service role), so the run summary may name members and ids.
@@ -237,10 +246,15 @@ interface MemberInfo {
 }
 
 /**
- * The matching pool for a course: everyone enrolled with matching_pref='system'
- * who is not already in a group on this course. Returns both the scoring inputs
- * (PartitionMember[]) and a lookup of name per user id for the write phase and
- * the response.
+ * The matching pool for a course: everyone who applied to be matched (applied_at
+ * is not null) and is not already in a group on this course. Returns both the
+ * scoring inputs (PartitionMember[]) and a lookup of name per user id for the
+ * write phase and the response.
+ *
+ * `proficiency` rides along in the profile: 0020's CHECK means an applied row
+ * always has one, but older enrolments that never applied may not, and the
+ * scorer's neutral fallback handles those rather than this query filtering them
+ * out.
  */
 async function loadPool(
   admin: SupabaseClient,
@@ -248,9 +262,12 @@ async function loadPool(
 ): Promise<{ members: PartitionMember[]; byId: Map<string, MemberInfo> }> {
   const { data: enrolments, error } = await admin
     .from('user_courses')
-    .select('user_id, availability, users ( full_name )')
+    .select('user_id, availability, proficiency, applied_at, users ( full_name )')
     .eq('course_id', courseId)
-    .eq('matching_pref', 'system')
+    .not('applied_at', 'is', null)
+    // Longest wait first, so if MAX_POOL ever truncates a course it truncates the
+    // students who only just applied rather than the ones who have waited a week.
+    .order('applied_at', { ascending: true })
     .limit(MAX_POOL);
   if (error) throw error;
 
@@ -263,7 +280,13 @@ async function loadPool(
     byId.set(r.user_id, { name: r.users?.full_name ?? null });
     members.push({
       id: r.user_id,
-      profile: { availability: decodeAvailability(r.availability) },
+      profile: {
+        availability: decodeAvailability(r.availability),
+        proficiency:
+          typeof r.proficiency === 'number' && Number.isFinite(r.proficiency)
+            ? r.proficiency
+            : null,
+      },
     });
   }
   return { members, byId };

@@ -21,6 +21,19 @@ export interface FindGroupRequester {
 export interface MatchSummary {
   score: number;
   schedule_score: number;
+  /**
+   * How well the levels mix — the pairwise term, not anybody's rating. Highest
+   * at one band apart, so a high value means "somebody here is a step ahead of
+   * you", not "these people are good at this".
+   *
+   * It is derived from a rating rather than being one, but be aware it narrows
+   * the guess: a requester who rated themselves at an extreme band can read the
+   * other side's band straight off this number. That is a self-assessment on one
+   * course, deliberately traded for a match card that can say why — the raw
+   * `proficiency` column is still never returned, and it is the only thing about
+   * a level this contract carries.
+   */
+  proficiency_score: number;
   fill_score: number;
   shared_slots: number;
 }
@@ -89,7 +102,7 @@ export interface BatchMatchResult {
   ran: boolean;
   reason?: string;
   course_id: string;
-  /** How many students were eligible (matching_pref='system', not yet grouped). */
+  /** How many students were eligible (in the pool via applied_at, not yet grouped). */
   pool_size: number;
   /** True when nothing was written — groups are proposals only. */
   dry_run: boolean;

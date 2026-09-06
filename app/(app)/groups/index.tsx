@@ -125,8 +125,15 @@ export default function GroupsScreen() {
 
         <Text style={styles.sectionHeader}>Find more</Text>
         <Button
+          label="Apply to be matched"
+          onPress={() => router.push('/(app)/groups/matching')}
+          accessibilityHint="Asks the system to place you in a group on a course, during the registration period"
+        />
+        <Button
           label="Suggest groups for me"
+          variant="secondary"
           onPress={() => router.push('/(app)/groups/match')}
+          style={styles.spaced}
           accessibilityHint="Ranks groups and study partners by how well your schedules line up"
         />
         <Button
@@ -146,13 +153,6 @@ export default function GroupsScreen() {
           variant="ghost"
           onPress={() => router.push('/(app)/groups/invitations')}
           style={styles.spaced}
-        />
-        <Button
-          label="How you get matched"
-          variant="ghost"
-          onPress={() => router.push('/(app)/groups/matching')}
-          style={styles.spaced}
-          accessibilityHint="Choose per course whether a coordinator can place you in a group"
         />
         <Button
           label="Back to home"

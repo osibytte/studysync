@@ -71,12 +71,17 @@ export type AppUserUpdate = Partial<
 >;
 
 /**
- * How a student wants to be grouped for a course. Defaults to 'system' on
- * enrolment, so a new student is in the batch-matching pool. Set to
- * 'self_organized' (via the set_matching_pref RPC) when they'd rather find their
- * own group — that removes them from admin-initiated batch matching.
+ * How well the student reckons they understand a course, in their own words rather
+ * than a mark: 1 struggling, 2 getting by, 3 fairly confident.
+ *
+ * Three bands, not five, chosen on 2026-09-05: a self-rating on a five-point scale
+ * clusters on the middle and the extra precision is noise, whereas three are
+ * answerable in one tap. Ordered, because the mixing rule in `src/lib/matching.ts`
+ * subtracts one band from another — which is also why it is a number and not a
+ * string. The words for each band live in `src/lib/groupRules.ts`
+ * (`PROFICIENCY_LABEL`); change one, change both.
  */
-export type MatchingPref = 'system' | 'self_organized';
+export type Proficiency = 1 | 2 | 3;
 
 export interface UserCourse {
   user_course_id: string;
@@ -84,7 +89,23 @@ export interface UserCourse {
   course_id: string;
   /** 28-char '0'/'1' string. Use src/lib/availability.ts to read or write it. */
   availability: string;
-  matching_pref: MatchingPref;
+  /**
+   * Null means the student has never said — NOT "average". Every row written
+   * before 0020 has one, and the scorer reads an unknown as the middle band so
+   * ranking degrades to schedule-only. Required before applying (0020's
+   * `user_courses_applied_ready` check).
+   */
+  proficiency: Proficiency | null;
+  /**
+   * When they asked the system to match them on this course. Null = not in the
+   * pool, which is the resting state: nothing enrols a student on their behalf.
+   *
+   * Set only by the `request_matching` RPC — `authenticated` holds no column
+   * privilege on it (0020 §4), and there is no withdrawal (0020 §5 refuses the
+   * delete that would fake one). Being *matched* is not stored: that is group
+   * membership on the course.
+   */
+  applied_at: string | null;
   created_at: string;
 }
 
@@ -101,11 +122,50 @@ export interface DevicePushToken {
 
 /**
  * Composite shape the UI actually renders — a course plus the student's
- * enrolment detail for it (availability, matching preference). Assembled
- * client-side from joined queries.
+ * enrolment detail for it (availability, proficiency, whether they have applied).
+ * Assembled client-side from joined queries.
  */
 export interface UserCourseWithDetail extends UserCourse {
   course: Course;
+}
+
+/**
+ * One registration period (0020 §6). Non-overlapping by an exclusion constraint,
+ * so "the open one" and "the next one" are single rows rather than a judgement call.
+ *
+ * It gates exactly one action, `request_matching`. Browsing discoverable groups,
+ * asking to join one, being invited, starting your own and the find-group
+ * suggestions all work identically whether a window is open, closed or has never
+ * existed — the owner's rule on 2026-09-05: "the registration window only matters
+ * to students that want the system to match them".
+ */
+export interface MatchingWindow {
+  window_id: string;
+  label: string;
+  opens_at: string;
+  closes_at: string;
+  created_at: string;
+}
+
+/**
+ * Return row of `matching_window_state()` — always exactly one row.
+ *
+ * `server_now` is the point of the RPC. Whether applications are open depends on a
+ * clock, and the only clock the client has is the device's; a phone a day out would
+ * otherwise disable the Apply button through an open window with nothing on screen
+ * to explain it. So the screen compares two instants the server handed it.
+ *
+ * The window described is the open one if there is one, else the next one to open.
+ * Everything but `server_now` is null when no window is open or pending — which is
+ * the normal state before an admin has ever opened one, not an error.
+ */
+export interface MatchingWindowState {
+  server_now: string;
+  is_open: boolean;
+  window_id: string | null;
+  label: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
 }
 
 /** Defaults for a fresh profile, matching the SQL column default. */
@@ -506,6 +566,13 @@ export interface GroupMaterialRow {
  * because an engagement notification that ignores a student's stated limit is how
  * notifications get switched off at the OS level — taking the 30-minute study
  * alarm they actually wanted with them.
+ *
+ * `'group_matched'` (0020 §8) is the odd one out in a different way: it is the only
+ * kind whose **words are composed in SQL**, inside `create_system_group`, because it
+ * has to be written in the same transaction that creates the group — a run that
+ * died in between would leave students grouped and never told, and nothing would
+ * retry it. So it has no `NotificationSubject` arm in `notificationRules.ts`; that
+ * file still owns its label, its urgency and its cooldown.
  */
 export type NotificationKind =
   | 'session_reminder'
@@ -515,6 +582,7 @@ export type NotificationKind =
   | 'message_activity'
   | 'file_shared'
   | 'invitation'
+  | 'group_matched'
   | 'session_needs_one_yes'
   | 'group_free_slot'
   | 'group_quiet'

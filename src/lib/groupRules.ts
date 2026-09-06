@@ -2,9 +2,11 @@ import type {
   GroupMemberDetailRow,
   GroupRole,
   GroupStatus,
-  MatchingPref,
+  MatchingWindowState,
   MyGroupRow,
+  Proficiency,
 } from '@/types/database';
+import { dayLabel, formatClock, localDayKey } from './chatRules';
 
 /**
  * Pure presentation and permission logic for groups.
@@ -208,39 +210,164 @@ export function requiresEveryone(
 }
 
 // ---------------------------------------------------------------------------
-// How you get matched (user_courses.matching_pref, migration 0007)
+// How you rate yourself (user_courses.proficiency, migration 0020)
 // ---------------------------------------------------------------------------
 
 /**
- * The two preferences, in the student's words rather than the column's.
+ * The three bands, in the student's words rather than the column's.
  *
- * 'system' is the column default, so every new enrolment starts opted in; the
- * labels are written to make that the unremarkable choice it is.
+ * 0020's §1 comment points at this table by name — change one, change both.
+ *
+ * Three bands and not a 1–10 slider: the scorer only ever asks how far apart two
+ * students are, so precision it cannot use is precision that invites people to
+ * round themselves upward. Three is also answerable honestly in one tap.
+ *
+ * Worded as how the course is GOING, never as how good the student is, because
+ * "struggling" has to be a safe thing to pick. It is the answer that gets you a
+ * group with somebody who can explain; a student who picks the top band to look
+ * competent gets matched as the explainer instead.
  */
-export const MATCHING_PREF_LABEL: Record<MatchingPref, string> = {
-  system: 'Match me automatically',
-  self_organized: 'I will find my own group',
+export const PROFICIENCY_LABEL: Record<Proficiency, string> = {
+  1: 'Struggling',
+  2: 'Getting by',
+  3: 'Fairly confident',
 };
 
-export const MATCHING_PREF_HINT: Record<MatchingPref, string> = {
-  system:
-    'When a coordinator runs matching for this course, you can be placed in a group with students whose free time lines up with yours.',
-  self_organized:
-    'You will never be placed automatically. Suggestions, browsing, requests and invitations all still work exactly the same.',
+export const PROFICIENCY_HINT: Record<Proficiency, string> = {
+  1: 'Lost in most of it, or behind and trying to catch up.',
+  2: 'Following along, but parts of it still do not click.',
+  3: 'Comfortable enough to explain most of it to someone else.',
+};
+
+/** Render order for the band chips: lowest first, so none of them reads as the default. */
+export const PROFICIENCY_CHOICES: readonly Proficiency[] = [1, 2, 3];
+
+/** Narrow an unknown/legacy column value to a band, or null. */
+export function asProficiency(value: unknown): Proficiency | null {
+  return value === 1 || value === 2 || value === 3 ? value : null;
+}
+
+// ---------------------------------------------------------------------------
+// Applying to be matched (user_courses.applied_at + matching_windows, 0020)
+// ---------------------------------------------------------------------------
+
+/** Whether a registration period is open, coming, or not scheduled at all. */
+export type WindowPhase = 'open' | 'upcoming' | 'none';
+
+export function windowPhase(state: MatchingWindowState | null | undefined): WindowPhase {
+  if (!state || !state.window_id) return 'none';
+  return state.is_open ? 'open' : 'upcoming';
+}
+
+/**
+ * The instant to date everything against: the SERVER's, not the device's.
+ *
+ * `matching_window_state()` returns `server_now` for exactly this reason. A phone
+ * whose clock is a day out would otherwise read an open window's deadline as
+ * "Yesterday" and leave the student staring at a live Apply button under text
+ * telling them they are too late. The timezone stays the device's — that part it
+ * is right about — so only the instant comes from the server.
+ *
+ * Exported because the Apply screen dates `applied_at` with it too: two clocks on
+ * one screen is how "applied Today" ends up under "open until Yesterday".
+ */
+export function serverNow(state: MatchingWindowState | null | undefined): Date {
+  const parsed = new Date(state?.server_now ?? '');
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+/** "Today, 5pm" / "12 September, 11:30am" — when a window opens or shuts. */
+export function windowWhenLabel(
+  iso: string | null | undefined,
+  now: Date = new Date()
+): string {
+  if (!iso) return '';
+  const day = dayLabel(localDayKey(iso), now);
+  const clock = formatClock(iso);
+  if (!day) return clock;
+  return clock ? `${day}, ${clock}` : day;
+}
+
+/**
+ * One line about the registration period, for the top of the Apply screen.
+ *
+ * The 'none' wording is load-bearing: a closed window is not a closed app. It
+ * says what still works, because everything except automatic matching does.
+ */
+export function windowBanner(state: MatchingWindowState | null | undefined): string {
+  const now = serverNow(state);
+  switch (windowPhase(state)) {
+    case 'open':
+      return `${state?.label ?? 'Matching'} is open until ${windowWhenLabel(
+        state?.closes_at,
+        now
+      )}.`;
+    case 'upcoming':
+      return `${state?.label ?? 'Matching'} opens ${windowWhenLabel(state?.opens_at, now)}.`;
+    case 'none':
+      return 'No matching period is scheduled. You can still browse groups, ask to join one, or start your own.';
+  }
+}
+
+/**
+ * Where one enrolment stands in the matching flow.
+ *
+ * Precedence matters and 'grouped' comes first on purpose: `request_matching`
+ * never clears `applied_at` and nothing else does either, because matched state
+ * is DERIVED from group membership rather than stored. Resolved in the other
+ * order, a student who had already been placed would be told they were still
+ * waiting. The same derivation is what lets leaving a group put you back in the
+ * pool with nothing to re-submit.
+ */
+export type MatchingStep =
+  | 'grouped'
+  | 'applied'
+  | 'needs_rating'
+  | 'needs_availability'
+  | 'ready';
+
+export function matchingStep(
+  enrolment: { proficiency: Proficiency | null; applied_at: string | null },
+  slotCount: number,
+  isGroupedOnCourse: boolean
+): MatchingStep {
+  if (isGroupedOnCourse) return 'grouped';
+  if (enrolment.applied_at) return 'applied';
+  if (enrolment.proficiency == null) return 'needs_rating';
+  if (slotCount <= 0) return 'needs_availability';
+  return 'ready';
+}
+
+export const MATCHING_STEP_TITLE: Record<MatchingStep, string> = {
+  grouped: 'You are in a group for this course',
+  applied: 'You are in the pool, waiting to be matched',
+  needs_rating: 'Say how this course is going',
+  needs_availability: 'Pick some free time',
+  ready: 'Ready to be matched',
 };
 
 /**
- * Whether a batch run would actually consider this enrolment.
- *
- * Mirrors run-batch-matching's pool: `matching_pref = 'system'` MINUS anyone
- * already in a group on the course — any group, whatever its status, which is
- * why the group need not be live for this to return false. Being opted in but
- * already grouped is not a mistake to correct, so the screen explains it instead
- * of hiding the setting.
+ * The paragraph under that title. The window only changes the wording of one
+ * step — 'ready' — because it only ever gated one action.
  */
-export function inMatchingPool(
-  pref: MatchingPref,
-  isGroupedOnCourse: boolean
-): boolean {
-  return pref === 'system' && !isGroupedOnCourse;
+export function matchingStepBody(step: MatchingStep, phase: WindowPhase): string {
+  switch (step) {
+    case 'grouped':
+      return 'Nothing left to do here. If you leave the group you go back in the pool, and the next matching run will place you again.';
+    case 'applied':
+      return 'Matching runs once the period closes, and you cannot withdraw — so leave your rating and free time as they are. They are what you will be matched on.';
+    case 'needs_rating':
+      return 'Matching puts students at different levels together, so that somebody in the group can explain. It needs your own answer before it can do that.';
+    case 'needs_availability':
+      return 'Matching starts from when you are free. A course with no free time picked has nothing to match on.';
+    case 'ready':
+      return phase === 'open'
+        ? 'Applying puts you in the pool for this course. It only goes one way: once you are in, you wait for the run.'
+        : 'You have everything matching needs. It opens when a coordinator schedules the next period — until then you can browse groups for this course, ask to join one, or wait to be invited.';
+  }
+}
+
+/** Mirrors `request_matching`'s own gate: ready, and a window actually open. */
+export function canApplyForMatching(step: MatchingStep, phase: WindowPhase): boolean {
+  return step === 'ready' && phase === 'open';
 }

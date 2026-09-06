@@ -2,7 +2,10 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { CoursePicker } from '@/screens/CoursePicker';
 
-/** Onboarding step 2 of 3. At least one course is required to continue. */
+/**
+ * Onboarding step 2 of 3. At least one course is required to continue, and each
+ * picked course needs its rating — that pair is what the matching run reads.
+ */
 export default function OnboardingCoursesScreen() {
   const router = useRouter();
 
@@ -10,6 +13,7 @@ export default function OnboardingCoursesScreen() {
     <CoursePicker
       showStepHeader
       requireAtLeastOne
+      requireRatings
       footerLabel={(count) =>
         count > 0
           ? `Continue with ${count} course${count === 1 ? '' : 's'}`

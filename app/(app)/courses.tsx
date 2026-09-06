@@ -18,7 +18,7 @@ export default function ManageCoursesScreen() {
 
   return (
     <CoursePicker
-      subtitle="Add or remove courses. Changes save as you tap."
+      subtitle="Add or remove courses, and change how you are finding one. Changes save as you tap."
       footerLabel={() => 'Done'}
       onDone={() => router.back()}
     />

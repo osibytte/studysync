@@ -124,8 +124,16 @@ describe('outbox ledger mirror: SELF_LEDGERED <-> claim_client_action in the mig
   const replayed = [...source.matchAll(/case '([a-z]+\.[a-z]+)':/g)].map((m) => m[1]);
 
   it('found both sides, so a rename cannot pass by emptying one of them', () => {
+    // The SQL floor stays at 15 even though 0020 dropped set_matching_pref:
+    // migrations are forward-only text, so 0007's claim of 'matching.pref' is
+    // still in the files and still counted here. A name lingering in `claimed`
+    // can only make the checks below more permissive, never wrongly fail them.
+    //
+    // The replay floor is back at 10 because that migration traded one queued
+    // action for another: 'matching.pref' out, 'course.proficiency' in. Only the
+    // second is queueable, and outbox.ts's header says why.
     expect(claimed.size).toBeGreaterThanOrEqual(15);
-    expect(selfLedgered.length).toBeGreaterThanOrEqual(6);
+    expect(selfLedgered.length).toBeGreaterThanOrEqual(5);
     expect(replayed.length).toBeGreaterThanOrEqual(10);
   });
 
@@ -191,7 +199,7 @@ describe('bucket mime mirror: MATERIALS_ALLOWED_MIME_TYPES <-> storage.buckets i
 });
 
 /**
- * Fifth mirror. The notification vocabulary, TypeScript against 0019's CHECK.
+ * Fifth mirror. The notification vocabulary, TypeScript against the CHECK in SQL.
  *
  * `0019` says it in its own comment — "These names are NOT chosen here … Change
  * one, change both" — and both directions fail without a stack trace:
@@ -208,19 +216,31 @@ describe('bucket mime mirror: MATERIALS_ALLOWED_MIME_TYPES <-> storage.buckets i
  * server sends and therefore one the table must accept. That makes this test also
  * the guard on `session_reminder`'s absence, which 0019 insists on twice — mark a
  * kind local and it must leave the CHECK; unmark one and it must appear.
+ *
+ * IT READS THE LAST DEFINITION, NOT 0019's, because migrations are forward-only:
+ * 0019 created this CHECK and 0020 replaced it to admit 'group_matched'. A test
+ * pinned to the file that happened to introduce a constraint starts failing the
+ * moment that constraint is legitimately widened, which teaches the next reader to
+ * delete the test rather than to trust it.
  */
 function sqlNotificationKinds(): string[] {
-  const sql = read('supabase/migrations/0019_stage5_notifications.sql').replace(/\r\n/g, '\n');
-  // Slice from the constraint itself: the comments above it name every kind in
-  // prose, and a name in a comment is not a value in the CHECK.
-  const check = sql.indexOf('check (kind in (');
-  expect(check).toBeGreaterThanOrEqual(0);
-  const close = sql.indexOf('))', check);
-  expect(close).toBeGreaterThan(check);
-  return [...sql.slice(check, close).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  let latest: string[] | null = null;
+  for (const file of readdirSync(MIGRATIONS).sort()) {
+    if (!file.endsWith('.sql')) continue;
+    const sql = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/\r\n/g, '\n');
+    // `kind in (...)` is only ever written about this table — messages_kind_shape
+    // (0016, 0017) ties each kind to a referent instead — but require the file to
+    // be about notifications anyway, so a future table cannot quietly take over.
+    if (!sql.includes('public.notifications')) continue;
+    for (const match of sql.matchAll(/check \(kind in \(([^)]*)\)\)/g)) {
+      latest = [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    }
+  }
+  expect(latest).not.toBeNull();
+  return latest as string[];
 }
 
-describe('notification kind mirror: NotificationKind <-> the CHECK in 0019', () => {
+describe('notification kind mirror: NotificationKind <-> the CHECK in SQL', () => {
   const fromSql = sqlNotificationKinds();
   const sentFromTs = (Object.keys(NOTIFICATION_KIND_LABEL) as NotificationKind[]).filter(
     (kind) => !NOTIFICATION_LOCAL[kind]
