@@ -231,6 +231,13 @@ export const NOTIFICATION_COOLDOWN: Record<NotificationKind, NotificationCooldow
  * the OS has already accepted, and `notifier.ts` never asks. The student turns it
  * off in Settings, or by declining the permission prompt on the *yes* tap.
  *
+ * `group_matched` also maps to **null**, for a different reason. It is the one
+ * notification a student who applied is actually waiting for — the answer to a
+ * request they made and cannot withdraw — so there is no switch to offer that a
+ * student would sanely use. It is not unstoppable, though, the way the alarm is:
+ * it is delivered by push, so `push_enabled` still silences it, and the row
+ * lands in the inbox either way.
+ *
  * Several kinds deliberately share a key: nobody wants a group's study times
  * split into three switches, so proposed/confirmed/cancelled ride together on
  * `notify_sessions`. The four nudges each get their own, because the whole point
@@ -244,6 +251,7 @@ export const NOTIFICATION_PREF_KEY: Record<NotificationKind, NotificationSwitchK
   message_activity: 'notify_chat',
   file_shared: 'notify_files',
   invitation: 'notify_invitations',
+  group_matched: null,
   session_needs_one_yes: 'nudge_needs_one_yes',
   group_free_slot: 'nudge_free_slot',
   group_quiet: 'nudge_group_quiet',
