@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { isRunningInExpoGo } from 'expo';
+import Constants from 'expo-constants';
 import {
   diffReminders,
   isReminderId,
@@ -232,6 +233,113 @@ export async function ensureNotifierReady(askIfNeeded = false): Promise<Notifier
   } catch (error) {
     console.warn('[notifier] setup failed', error);
     return 'unavailable';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The remote half — one Expo push token per device
+// ---------------------------------------------------------------------------
+
+/**
+ * Why this device cannot produce a push token, in words a screen can show — or
+ * null when it can.
+ *
+ * A SEPARATE question from `notifierBlockedReason`, and the difference is the
+ * whole reason step 6 needs a development build. Local alarms work in Expo Go on
+ * iOS today, and that is what Stage 5's first half shipped on. Remote push does
+ * not: **Expo removed Expo Go's push support in SDK 53**, on both platforms, so
+ * `getExpoPushTokenAsync` there has no credentials to hand back. The `isRunningInExpoGo`
+ * check below therefore has no `Platform.OS === 'android'` guard, unlike the one
+ * above — this is not the Android-only crash, it is a flat absence of the feature.
+ *
+ * The `projectId` case is not an error either. It is genuinely absent until
+ * somebody runs `eas init`, and until then this returns a reason instead of
+ * throwing, so the app is complete and the push half is merely off.
+ */
+export function pushTokenBlockedReason(): string | null {
+  if (Platform.OS === 'web') return 'Push notifications need the phone app.';
+  if (isRunningInExpoGo()) {
+    return 'Push notifications need a development build, not Expo Go.';
+  }
+  if (!easProjectId()) {
+    return 'This build has no Expo project id, so push is not set up yet.';
+  }
+  return null;
+}
+
+/**
+ * The EAS project id `getExpoPushTokenAsync` needs, from either place it can live.
+ *
+ * `Constants.easConfig` is what a real EAS build carries; `expoConfig.extra.eas`
+ * is what `app.json` declares and what a local dev build reads. Checking both
+ * means the same code works in a dev build and a store build without a flag.
+ *
+ * Passing it explicitly rather than letting the library find it: the library's own
+ * lookup THROWS when the id is missing, and a missing id is the expected state of
+ * this repo until the build is provisioned. A thrown error at sign-in would be a
+ * crash on the happy path.
+ */
+function easProjectId(): string | null {
+  const fromEas = Constants.easConfig?.projectId;
+  if (typeof fromEas === 'string' && fromEas.length > 0) return fromEas;
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: unknown } } | undefined;
+  const fromExtra = extra?.eas?.projectId;
+  if (typeof fromExtra === 'string' && fromExtra.length > 0) return fromExtra;
+  return null;
+}
+
+/** What the device can be told about, and what it is called when it is. */
+export interface PushTokenResult {
+  /** The `ExponentPushToken[…]` string, or null when there is none to have. */
+  token: string | null;
+  /** Null on success; otherwise why not, ready to show. */
+  blocked: string | null;
+}
+
+/**
+ * This device's Expo push token, or a reason there is none.
+ *
+ * Requires permission, so `ensureNotifierReady` runs first — and with
+ * `askIfNeeded` false, because this is called at sign-in. A student who has not
+ * yet seen the prefs screen explain what notifications are for should not meet an
+ * OS prompt while their groups are still loading; the screen asks, and the next
+ * sign-in picks the token up.
+ *
+ * The token is a DEVICE identity, not an account one. Two students sharing a phone
+ * produce the same token, which is why `device_push_tokens.expo_token` is unique
+ * and the upsert moves the row's `user_id` rather than adding a second row (see
+ * `registerPushToken`). Getting that backwards sends one student's notifications to
+ * the other.
+ *
+ * A simulator has no push credentials and the call throws; caught, so the return is
+ * a null token rather than a broken sign-in.
+ */
+export async function getExpoPushToken(): Promise<PushTokenResult> {
+  const blocked = pushTokenBlockedReason();
+  if (blocked) return { token: null, blocked };
+
+  const mod = loadNotifications();
+  if (!mod) return { token: null, blocked: 'Notifications are not available here.' };
+
+  const status = await ensureNotifierReady();
+  if (status !== 'ready') {
+    return { token: null, blocked: 'Notifications are turned off for this app.' };
+  }
+
+  const projectId = easProjectId();
+  if (!projectId) {
+    // Re-checked after the awaits purely so the non-null is local to the call.
+    return { token: null, blocked: 'This build has no Expo project id.' };
+  }
+
+  try {
+    const { data } = await mod.getExpoPushTokenAsync({ projectId });
+    return typeof data === 'string' && data.length > 0
+      ? { token: data, blocked: null }
+      : { token: null, blocked: 'The push service returned no token.' };
+  } catch (error) {
+    console.warn('[notifier] could not get a push token', error);
+    return { token: null, blocked: 'Could not reach the push service.' };
   }
 }
 
