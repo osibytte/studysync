@@ -13,6 +13,7 @@ import type {
   NotificationKind,
   NotificationPrefs,
   NotificationSwitchKey,
+  WithheldReason,
 } from '@/types/database';
 
 /**
@@ -744,12 +745,57 @@ export function isDailyCapReached(
   return deliveredNonUrgentToday >= cap;
 }
 
-/** Why a notification was withheld — for the sender's log, never for a student. */
-export type WithheldReason =
-  | 'push_disabled'
-  | 'kind_disabled'
-  | 'quiet_hours'
-  | 'daily_cap';
+/**
+ * Why a notification was withheld — for the sender's log, never for a student.
+ *
+ * Declared in `src/types/database.ts` since `0021` gave it a CHECK, and re-exported
+ * here because this is where it is decided. One spelling, two homes, no drift.
+ */
+export type { WithheldReason };
+
+/**
+ * Is this withholding worth coming back to?
+ *
+ * The sixth per-kind-style table, and the reason `notifications.withheld` is a
+ * four-value column rather than a boolean. Exactly one reason is a DELAY:
+ *
+ *   - `quiet_hours` — the event still matters, the hour does not suit. The sender
+ *     is meant to return when the window ends, which is what
+ *     `minutesUntilQuietHoursEnd` computes.
+ *   - `daily_cap` — spent for today, but a row already withheld is not owed a
+ *     later delivery. Tomorrow's allowance belongs to tomorrow's notifications;
+ *     replaying yesterday's would mean the cap only ever deferred noise.
+ *   - `push_disabled` / `kind_disabled` — the student's own answer. Time cannot
+ *     change it, and re-pushing when they flip the switch back on would deliver a
+ *     backlog of things they had chosen not to hear.
+ *
+ * A `Record` rather than a list so adding a reason to the union without deciding
+ * this fails to compile, and so the mirror test has a runtime witness for a type
+ * that otherwise vanishes at build time.
+ */
+export const NOTIFICATION_WITHHOLD_RETRYABLE: Record<WithheldReason, boolean> = {
+  push_disabled: false,
+  kind_disabled: false,
+  quiet_hours: true,
+  daily_cap: false,
+};
+
+/** Every reason, in declaration order — the runtime shadow of `WithheldReason`. */
+export const WITHHELD_REASONS = Object.keys(
+  NOTIFICATION_WITHHOLD_RETRYABLE
+) as WithheldReason[];
+
+/**
+ * Whether the sender should pick a withheld row back up.
+ *
+ * Takes `null` because that is what the column holds for a row that was never
+ * withheld at all, and such a row is pending rather than retryable — the sender
+ * has not tried it yet, so there is nothing to retry.
+ */
+export function isRetryableWithholding(reason: WithheldReason | null): boolean {
+  if (reason === null) return false;
+  return NOTIFICATION_WITHHOLD_RETRYABLE[reason] === true;
+}
 
 export interface NotifyDecision {
   deliver: boolean;

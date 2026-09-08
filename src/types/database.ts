@@ -79,6 +79,15 @@ export interface AppUser {
   department: string | null;
   notification_prefs: NotificationPrefs;
   onboarding_complete: boolean;
+  /**
+   * IANA zone as the device reported it (`0021`), or null if it never did.
+   *
+   * Exists for the sender, not for any screen: quiet hours are a local-clock rule
+   * (`isWithinQuietHours` reads `getHours()`), every caller until Stage 5 step 6
+   * WAS the student's device, and a server-side sender has no other way to know
+   * what "22:00" means to this student.
+   */
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -86,7 +95,7 @@ export interface AppUser {
 export type AppUserUpdate = Partial<
   Pick<
     AppUser,
-    'full_name' | 'department' | 'notification_prefs' | 'onboarding_complete'
+    'full_name' | 'department' | 'notification_prefs' | 'onboarding_complete' | 'timezone'
   >
 >;
 
@@ -612,6 +621,24 @@ export type NotificationKind =
 export type SentNotificationKind = Exclude<NotificationKind, 'session_reminder'>;
 
 /**
+ * Why the sender did not push a row it had already written (`0021`'s CHECK).
+ *
+ * Lives here rather than in `notificationRules.ts` for the same reason
+ * `NotificationKind` does: a CHECK constrains it, so it belongs beside the row
+ * shape, and a mirror test pins the two against each other.
+ *
+ * Only `'quiet_hours'` is retryable. That asymmetry is the whole reason the reason
+ * is stored at all rather than a boolean — quiet hours are a delay the sender is
+ * meant to come back from, while a spent cap or a switched-off kind is finished
+ * with until the student changes something.
+ */
+export type WithheldReason =
+  | 'push_disabled'
+  | 'kind_disabled'
+  | 'quiet_hours'
+  | 'daily_cap';
+
+/**
  * One row per notification the sender delivered to one student (0019).
  *
  * `title` and `body` are stored as sent rather than re-derived, so the inbox shows
@@ -621,6 +648,15 @@ export type SentNotificationKind = Exclude<NotificationKind, 'session_reminder'>
  *
  * `read_at` is the inbox's own cursor and is **not** `group_members.last_read_at`
  * — dismissing a notification is not reading the conversation.
+ *
+ * The last two fields are OPTIONAL and every other one is not, which is a claim
+ * about the client rather than about the table: `0021` made both columns `not
+ * null`-free but the real point is that `NOTIFICATION_COLUMNS` in
+ * `src/lib/notifications.ts` does not ask for them. They are the sender's own
+ * bookkeeping — a student cannot see or act on either — so shipping them to every
+ * device on every page of the inbox would be bytes spent on nothing. Optional here
+ * keeps that projection honest instead of casting a lie; the sender reads the
+ * columns through its own Deno types, which are not these.
  */
 export interface Notification {
   notification_id: string;
@@ -634,6 +670,16 @@ export interface Notification {
   dedupe_key: string;
   created_at: string;
   read_at: string | null;
+  /**
+   * When Expo accepted the push (`0021`). Null means it never went out — pending,
+   * withheld, or the student has no registered device. The daily cap counts these,
+   * not rows, because a cap you cannot count is a cap you cannot enforce.
+   *
+   * Absent, not null, in anything the client fetched.
+   */
+  pushed_at?: string | null;
+  /** Null when delivered or still pending. See `WithheldReason`. Absent client-side. */
+  withheld?: WithheldReason | null;
 }
 
 

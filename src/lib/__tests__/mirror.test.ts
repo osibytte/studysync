@@ -1,7 +1,12 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { MATERIALS_ALLOWED_MIME_TYPES } from '../chatRules';
-import { NOTIFICATION_KIND_LABEL, NOTIFICATION_LOCAL } from '../notificationRules';
+import {
+  NOTIFICATION_KIND_LABEL,
+  NOTIFICATION_LOCAL,
+  WITHHELD_REASONS,
+  isRetryableWithholding,
+} from '../notificationRules';
 import type { NotificationKind } from '@/types/database';
 
 /**
@@ -261,5 +266,67 @@ describe('notification kind mirror: NotificationKind <-> the CHECK in SQL', () =
     // would give a student with a signal the alarm twice.
     expect(fromSql).not.toContain('session_reminder');
     expect(NOTIFICATION_LOCAL.session_reminder).toBe(true);
+  });
+});
+
+/**
+ * Sixth mirror. `WithheldReason` against `0021`'s CHECK on `notifications.withheld`.
+ *
+ * Same shape of bug as the fifth, and worse to notice. The sender decides a reason
+ * in TypeScript and writes it in SQL, so a reason the CHECK has never heard of is a
+ * `23514` — and it fires on the WITHHOLDING path, the one nobody watches, in a
+ * scheduled function with no student waiting on the response. The visible symptom
+ * would be that quiet hours stopped working, days later, for everyone.
+ *
+ * The other direction is the quieter half again: a value in the CHECK with no arm
+ * in `NOTIFICATION_WITHHOLD_RETRYABLE` can be stored by hand and the sender has no
+ * opinion on whether to retry it, so `isRetryableWithholding` would answer
+ * `undefined === true` — false — and the row would be abandoned silently.
+ *
+ * `WithheldReason` is a type and types do not survive to runtime, so the expected
+ * list comes from the retryable table's keys. That is the whole reason the table is
+ * a `Record` and not an array of strings.
+ */
+function sqlWithheldReasons(): string[] {
+  let latest: string[] | null = null;
+  for (const file of readdirSync(MIGRATIONS).sort()) {
+    if (!file.endsWith('.sql')) continue;
+    const sql = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/\r\n/g, '\n');
+    if (!sql.includes('public.notifications')) continue;
+    // Newlines allowed inside the parens: the CHECK is written across two lines in
+    // 0021 and reformatting it must not silently empty this parse — which is what
+    // the "found both sides" assertion below is there to catch if it ever does.
+    for (const match of sql.matchAll(/withheld in \(([^)]*)\)/g)) {
+      latest = [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    }
+  }
+  expect(latest).not.toBeNull();
+  return latest as string[];
+}
+
+describe('withheld reason mirror: WithheldReason <-> the CHECK in SQL', () => {
+  const fromSql = sqlWithheldReasons();
+
+  it('found both sides, so an empty parse cannot pass for agreement', () => {
+    expect(fromSql.length).toBe(4);
+    expect(WITHHELD_REASONS.length).toBe(4);
+  });
+
+  it('accepts exactly the reasons the sender can decide', () => {
+    expect([...fromSql].sort()).toEqual([...WITHHELD_REASONS].sort());
+  });
+
+  it('leaves exactly one of them retryable', () => {
+    // The asymmetry 0021's header is built on. If a second reason ever becomes
+    // retryable that is a real decision and this test should be changed by hand —
+    // but it must not happen by someone flipping a boolean without reading why.
+    const retryable = WITHHELD_REASONS.filter((r) => isRetryableWithholding(r));
+    expect(retryable).toEqual(['quiet_hours']);
+  });
+
+  it('treats a row that was never withheld as pending, not retryable', () => {
+    // `withheld is null` means the sender has not tried yet. Reading that as
+    // "retry" would make every fresh row look like a second attempt.
+    expect(isRetryableWithholding(null)).toBe(false);
   });
 });
