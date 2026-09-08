@@ -8,10 +8,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useInvitations } from '@/hooks/useInvitations';
 import { useMyGroups } from '@/hooks/useMyGroups';
+import { useNotificationBadge } from '@/hooks/useNotifications';
 import { useUnread } from '@/hooks/useUnread';
 import { useUserCourses } from '@/hooks/useUserCourses';
 import { countSelected, decodeAvailability, describeSelection } from '@/lib/availability';
-import { colors, fontSize, radius, spacing, typography } from '@/theme';
+import { MIN_TOUCH, colors, fontSize, radius, spacing, typography } from '@/theme';
 
 /**
  * Home.
@@ -32,13 +33,20 @@ export default function HomeScreen() {
   const { groups, reload: reloadGroups } = useMyGroups(userId);
   const { invitations, reload: reloadInvites } = useInvitations(userId);
   const { summary: unreadSummaryLine, reload: reloadUnread } = useUnread(userId);
+  const { unread: unreadNotifications, reload: reloadBadge } = useNotificationBadge(userId);
 
   const onRefresh = useCallback(async () => {
     // Drain the outbox before refetching, or a pull-to-refresh would overwrite
     // pending local changes with older server state.
     await syncNow();
-    await Promise.all([reload(), reloadGroups(), reloadInvites(), reloadUnread()]);
-  }, [syncNow, reload, reloadGroups, reloadInvites, reloadUnread]);
+    await Promise.all([
+      reload(),
+      reloadGroups(),
+      reloadInvites(),
+      reloadUnread(),
+      reloadBadge(),
+    ]);
+  }, [syncNow, reload, reloadGroups, reloadInvites, reloadUnread, reloadBadge]);
 
   /**
    * Refetch the group counts when home comes back into focus.
@@ -48,7 +56,8 @@ export default function HomeScreen() {
    * count from before. The first focus is skipped — each hook fetches on mount.
    *
    * `useUnread` is deliberately absent: it runs its own focus effect, so listing
-   * it here would fetch the counts twice on every return.
+   * it here would fetch the counts twice on every return. `useNotificationBadge`
+   * is absent for the same reason.
    */
   const firstFocus = useRef(true);
   useFocusEffect(
@@ -78,12 +87,42 @@ export default function HomeScreen() {
           <RefreshControl refreshing={syncing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />
         }
       >
-        <Text style={styles.greeting}>
-          Hi{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
-        </Text>
-        <Text style={styles.subtitle}>
-          {profile?.department ?? 'Department not set'}
-        </Text>
+        <View style={styles.greetingRow}>
+          <View style={styles.greetingCol}>
+            <Text style={styles.greeting}>
+              Hi{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
+            </Text>
+            <Text style={styles.subtitle}>
+              {profile?.department ?? 'Department not set'}
+            </Text>
+          </View>
+          {/*
+            The inbox lives here rather than in a card, because it is a place
+            rather than a thing that happened — and the count is the only part of
+            it worth interrupting the screen for. The number is a bare digit and
+            the label always spells "Notifications" out, so it reads the same in
+            greyscale and to a screen reader.
+          */}
+          <Pressable
+            onPress={() => router.push('/(app)/notifications')}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadNotifications > 0
+                ? `Notifications, ${unreadNotifications} unread`
+                : 'Notifications'
+            }
+            style={({ pressed }) => [styles.bell, pressed && styles.bellPressed]}
+          >
+            <Text style={styles.bellLabel}>Notifications</Text>
+            {unreadNotifications > 0 && (
+              <View style={styles.bellCount}>
+                <Text style={styles.bellCountText}>
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
 
         {/* Groups lead. One card either way, so the screen does not reshuffle. */}
         <View style={styles.nextCard}>
@@ -197,6 +236,30 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   greeting: { ...typography.title },
+  greetingRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  greetingCol: { flex: 1, paddingRight: spacing.md },
+  bell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  bellPressed: { backgroundColor: colors.surfaceAlt },
+  bellLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.primary },
+  bellCount: {
+    marginLeft: spacing.xs,
+    minWidth: 20,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+  },
+  bellCountText: { fontSize: fontSize.xs, fontWeight: '700', color: colors.primary },
   subtitle: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: spacing.xs },
   nextCard: {
     marginTop: spacing.xl,

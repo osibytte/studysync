@@ -3,6 +3,9 @@ import {
   NOTIFICATION_COOLDOWN,
   NOTIFICATION_KIND_LABEL,
   NOTIFICATION_LOCAL,
+  NOTIFICATION_PREF_KEY,
+  NOTIFICATION_SWITCH,
+  NOTIFICATION_SWITCH_ORDER,
   NOTIFICATION_URGENT,
   REMINDER_FIRE_TOLERANCE_MS,
   REMINDER_ID_PREFIX,
@@ -209,6 +212,11 @@ describe('the kind tables', () => {
       expect(NOTIFICATION_KIND_LABEL[kind]).toBeTruthy();
       expect(typeof NOTIFICATION_URGENT[kind]).toBe('boolean');
       expect(typeof NOTIFICATION_LOCAL[kind]).toBe('boolean');
+      expect(NOTIFICATION_COOLDOWN[kind]).toBeTruthy();
+      // `null` is an answer here, so `in` rather than truthiness: a kind missing
+      // from the table and a kind deliberately given no switch must not look the
+      // same to this test.
+      expect(kind in NOTIFICATION_PREF_KEY).toBe(true);
     }
   });
 
@@ -224,6 +232,31 @@ describe('the kind tables', () => {
       'session_cancelled',
       'session_reminder',
     ]);
+  });
+
+  /**
+   * The two kinds with no switch, named — because "no switch" is a product
+   * decision each time and not a gap. The alarm has none because the app cannot
+   * cancel one the OS already holds, so a switch would be a lie; being matched has
+   * none because it is the answer to an application the student made and cannot
+   * withdraw. A third kind arriving here should be argued for, not defaulted into.
+   */
+  it('leaves exactly the alarm and being matched without a switch', () => {
+    const unswitchable = ALL_KINDS.filter((k) => NOTIFICATION_PREF_KEY[k] === null);
+    expect(unswitchable.sort()).toEqual(['group_matched', 'session_reminder']);
+  });
+
+  it('shows every switch key exactly once, and governs at least one kind with each', () => {
+    const keys = [...NOTIFICATION_SWITCH_ORDER];
+    // Exactly once: a key listed twice renders two identical rows, and one left
+    // out is a switch that exists in the type and on no screen.
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.sort()).toEqual(Object.keys(NOTIFICATION_SWITCH).sort());
+
+    for (const key of keys) {
+      const governed = ALL_KINDS.filter((k) => NOTIFICATION_PREF_KEY[k] === key);
+      expect(governed.length).toBeGreaterThan(0);
+    }
   });
 });
 

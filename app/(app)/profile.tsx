@@ -201,6 +201,13 @@ export default function ProfileScreen() {
         </Text>
       )}
 
+      <Text style={styles.sectionHeader}>Notifications</Text>
+      <Button
+        label="Notification settings"
+        variant="secondary"
+        onPress={() => router.push('/(app)/notification-settings')}
+      />
+
       <Button
         label="Sign out"
         variant="ghost"

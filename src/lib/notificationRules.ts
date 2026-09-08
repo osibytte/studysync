@@ -507,6 +507,56 @@ export function buildInbox(rows: readonly Notification[], now: Date = new Date()
 }
 
 /**
+ * Where tapping a notification should take the student, or null when nowhere.
+ *
+ * An exhaustive `switch` rather than a table, and it is the SIXTH thing a new kind
+ * has to be answered for: a notification you cannot tap through is a dead end, and
+ * the compiler is the only thing that will notice one. A `default` arm returning
+ * null would have silently absorbed every kind added after this was written, which
+ * is the exact failure the five tables above are shaped to prevent.
+ *
+ * Null is a real answer, twice over. A group-scoped kind whose `group_id` is null —
+ * possible, since `0019` allows it and a cascade nulls nothing but deletes the row —
+ * has nowhere to go, and so does anything not tied to a place in the app. The inbox
+ * renders those as plain, unpressable rows: the title and body are the whole
+ * message, which for `group_matched` is very nearly true anyway.
+ *
+ * Note what each destination is chosen for. `file_shared` goes to the files tab
+ * rather than the timeline, because a student told about a file wants the file, and
+ * the timeline entry for it is hundreds of messages back by the time they look.
+ * Everything session-shaped goes to the timeline, because that is where a study
+ * time is answered — the group's front page can only show it.
+ */
+export function notificationRoute(
+  row: Pick<Notification, 'kind' | 'group_id'>
+): string | null {
+  const gid = row.group_id;
+  switch (row.kind) {
+    // The timeline: where a proposal is answered and a cancellation explained.
+    case 'session_proposed':
+    case 'session_confirmed':
+    case 'session_cancelled':
+    case 'session_needs_one_yes':
+    case 'message_activity':
+      return gid ? `/(app)/groups/${gid}/chat` : null;
+    // The files tab, for the reason in the header.
+    case 'file_shared':
+      return gid ? `/(app)/groups/${gid}/files` : null;
+    // The group's front page: a nudge is about the group, not a message in it.
+    case 'group_matched':
+    case 'group_free_slot':
+    case 'group_quiet':
+      return gid ? `/(app)/groups/${gid}` : null;
+    // Not group-scoped from the recipient's side — they are not a member yet, so
+    // the group's own screens would refuse them. The invitations list is the place
+    // the answer is given.
+    case 'invitation':
+    case 'invitation_unanswered':
+      return '/(app)/groups/invitations';
+  }
+}
+
+/**
  * Newest first, `notification_id` breaking the tie — the exact order of
  * `notifications_inbox_idx (user_id, created_at desc, notification_id desc)`.
  *
