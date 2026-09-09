@@ -1,0 +1,22 @@
+-- ---------------------------------------------------------------------------
+-- 0023 — close the grant gap 0022 left.
+--
+-- Postgres grants EXECUTE to PUBLIC by default, so `grant execute … to
+-- authenticated` alone leaves a function callable as anon. The ritual since
+-- 0005 (restated in 0019's own grants section) is: revoke from public and anon,
+-- grant to authenticated — so the refusal happens at the permission layer,
+-- 42501, before a line of the function runs. 0019's two mark-read RPCs did it;
+-- 0022 forgot.
+--
+-- Nothing was exploitable in the gap: both functions open with
+-- `if v_uid is null then raise` and a caller without a verified JWT has no
+-- auth.uid(). Measured live: anon got P0001 'You must be signed in.' rather
+-- than 42501 — safe, but one raise deeper into the function than the ritual
+-- intends, and the live harness's anon assertion expects the permission
+-- refusal. This migration restores the standard shape.
+--
+-- Revokes only; the authenticated grants from 0022 stand. Idempotent, like
+-- every revoke.
+-- ---------------------------------------------------------------------------
+revoke execute on function public.register_push_token(text, text) from public, anon;
+revoke execute on function public.forget_push_token(text) from public, anon;
