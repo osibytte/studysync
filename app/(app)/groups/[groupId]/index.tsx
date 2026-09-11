@@ -34,7 +34,7 @@ import { enqueue } from '@/lib/outbox';
 import { refreshReminders } from '@/lib/reminders';
 import { friendlyError } from '@/lib/supabase';
 import { validateGroupName } from '@/lib/validation';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * One group: who is in it, when it can meet, who wants in, and what you can do
@@ -179,7 +179,7 @@ export default function GroupDetailScreen() {
   if (loading && !group) {
     return (
       <Screen title="Group">
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       </Screen>
     );
   }
@@ -571,8 +571,8 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   headerCourse: {
     fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.primary,
+    fontFamily: FONT.bold,
+    color: colors.primaryDark,
     marginLeft: spacing.sm,
   },
   statusHint: {
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowText: { flex: 1, paddingRight: spacing.sm },
-  rowName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  rowName: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
   rowMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
   rowActions: { flexDirection: 'row', alignItems: 'center' },
   smallButton: { paddingHorizontal: spacing.md, marginLeft: spacing.xs },
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   linkRowText: { flex: 1, fontSize: fontSize.sm, color: colors.text, paddingRight: spacing.sm },
-  linkRowAction: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  linkRowAction: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',

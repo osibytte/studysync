@@ -14,7 +14,7 @@ import {
   quietHoursEnabled,
   quietHoursLabel,
 } from '@/lib/notificationRules';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * Notification preferences.
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: spacing.md,
   },
-  alertTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text },
+  alertTitle: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.text },
   alertBody: {
     fontSize: fontSize.sm,
     color: colors.text,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   alertNote: { fontSize: fontSize.xs, color: colors.text, marginTop: spacing.sm, lineHeight: 18 },
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xl,
     marginBottom: spacing.md,

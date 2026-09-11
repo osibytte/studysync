@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNetwork } from '@/context/NetworkContext';
-import { colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, spacing } from '@/theme';
 
 /**
  * Persistent connectivity strip.
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   text: {
     color: colors.textInverse,
     fontSize: fontSize.xs,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     textAlign: 'center',
   },
 });

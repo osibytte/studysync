@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OfflineBanner } from './OfflineBanner';
-import { colors, fontSize, spacing, typography } from '@/theme';
+import { colors, fontSize, FONT, spacing, typography } from '@/theme';
 
 interface Props {
   children: React.ReactNode;
@@ -18,6 +18,8 @@ interface Props {
   subtitle?: string;
   /** False for full-height layouts that manage their own scrolling (e.g. FlatList). */
   scroll?: boolean;
+  /** Center the content vertically in the leftover space (auth screens). */
+  centered?: boolean;
   /** Pinned to the bottom, outside the scroll area — for primary actions. */
   footer?: React.ReactNode;
   contentStyle?: ViewStyle;
@@ -41,6 +43,7 @@ export function Screen({
   title,
   subtitle,
   scroll = true,
+  centered = false,
   footer,
   contentStyle,
   footerStyle,
@@ -73,14 +76,22 @@ export function Screen({
         {scroll ? (
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={[styles.content, contentStyle]}
+            contentContainerStyle={[
+              styles.content,
+              centered && styles.contentCentered,
+              contentStyle,
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             {body}
           </ScrollView>
         ) : (
-          <View style={[styles.flex, styles.content, contentStyle]}>{body}</View>
+          <View
+            style={[styles.flex, styles.content, centered && styles.bodyCentered, contentStyle]}
+          >
+            {body}
+          </View>
         )}
         {!!footer && <View style={[styles.footer, footerStyle]}>{footer}</View>}
       </KeyboardAvoidingView>
@@ -92,12 +103,17 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  // Auth screens: the form floats in the middle of the leftover space, with
+  // flexGrow so the keyboard can still collapse the space and push it up.
+  contentCentered: { flexGrow: 1, justifyContent: 'center' },
+  bodyCentered: { justifyContent: 'center' },
   header: { marginBottom: spacing.xl },
   subtitle: {
     fontSize: fontSize.md,
     color: colors.textMuted,
     marginTop: spacing.sm,
     lineHeight: 22,
+    fontFamily: FONT.regular,
   },
   footer: {
     padding: spacing.lg,

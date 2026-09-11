@@ -21,7 +21,7 @@ import {
 } from '@/lib/groupRules';
 import { requestMatching } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type { UserCourseWithDetail } from '@/types/database';
 
 /**
@@ -122,7 +122,7 @@ export default function ApplyForMatchingScreen() {
       footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
     >
       {windowLoading && !matchingWindow && !unavailable ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : (
         <View style={[styles.banner, phase === 'open' && styles.bannerOpen]}>
           <Text style={styles.bannerText}>
@@ -140,7 +140,7 @@ export default function ApplyForMatchingScreen() {
       )}
 
       {loading && userCourses.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : error && userCourses.length === 0 ? (
         <Text style={styles.formError}>{error}</Text>
       ) : userCourses.length === 0 ? (
@@ -214,7 +214,7 @@ function CourseCard({
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <Text style={styles.code}>{code}</Text>
-        {busy && <ActivityIndicator size="small" color={colors.primary} />}
+        {busy && <ActivityIndicator size="small" color={colors.primaryDark} />}
       </View>
       {!!row.course?.course_title && (
         <Text style={styles.title} numberOfLines={2}>
@@ -268,31 +268,31 @@ function CourseCard({
 const styles = StyleSheet.create({
   loader: { marginVertical: spacing.xl },
   banner: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
   },
   bannerOpen: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   bannerText: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
   card: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  code: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  code: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   title: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
   stepTitle: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.md,
   },
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   },
   apply: { marginTop: spacing.md },
   linkRow: { minHeight: MIN_TOUCH, justifyContent: 'center' },
-  link: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  link: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   emptyText: {
     fontSize: fontSize.sm,
     color: colors.textMuted,

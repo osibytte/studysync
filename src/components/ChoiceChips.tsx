@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 export interface Choice<T> {
   value: T;
@@ -78,7 +78,12 @@ export function ChoiceChips<T extends string | number>({
 }
 
 const styles = StyleSheet.create({
-  label: { fontSize: fontSize.xs, fontWeight: '600', color: colors.textMuted, marginBottom: spacing.xs },
+  label: {
+    fontSize: fontSize.xs,
+    fontFamily: FONT.semi,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
   row: { paddingVertical: spacing.xs, gap: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
@@ -86,12 +91,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  // Selected = lime with ink text, matching the primary button.
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipDisabled: { opacity: 0.55 },
-  chipText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
-  chipTextActive: { color: colors.textInverse },
+  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  chipTextActive: { color: colors.text },
 });

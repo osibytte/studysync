@@ -20,7 +20,7 @@ import { useMyGroups } from '@/hooks/useMyGroups';
 import { useUnread } from '@/hooks/useUnread';
 import { lastMessageLine, unreadBadge } from '@/lib/chatRules';
 import { capacityLabel, isCreator } from '@/lib/groupRules';
-import { colors, fontSize, radius, spacing, typography } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing, typography } from '@/theme';
 import type { MyGroupRow, UnreadCountRow } from '@/types/database';
 
 /**
@@ -77,7 +77,7 @@ export default function GroupsScreen() {
           <RefreshControl
             refreshing={syncing}
             onRefresh={() => void onRefresh()}
-            tintColor={colors.primary}
+            tintColor={colors.primaryDark}
           />
         }
       >
@@ -103,7 +103,7 @@ export default function GroupsScreen() {
         )}
 
         {loading && groups.length === 0 ? (
-          <ActivityIndicator color={colors.primary} style={styles.loader} />
+          <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
         ) : error && groups.length === 0 ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : groups.length === 0 ? (
@@ -257,40 +257,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.accentSoft,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.flameSoft,
+    borderWidth: 1.5,
+    borderColor: colors.flame,
   },
-  inviteBannerText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
-  inviteBannerLink: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  inviteBannerText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  inviteBannerLink: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.flame },
   card: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {
     flex: 1,
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     paddingRight: spacing.sm,
   },
-  cardCourse: { fontSize: fontSize.sm, color: colors.primary, marginTop: spacing.xs },
-  cardMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  cardCourse: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.primaryDark, marginTop: spacing.xs },
+  cardMeta: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 2 },
   cardPreview: {
     fontSize: fontSize.sm,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
     marginTop: spacing.sm,
   },
   /** Unread reads as darker and heavier, so the badge is not the only signal. */
-  cardPreviewUnread: { color: colors.text, fontWeight: '600' },
+  cardPreviewUnread: { color: colors.text, fontFamily: FONT.semi },
   /**
    * Shaped like `StatusPill` on purpose — same padding, radius and text size —
    * but the only filled chip on the card, which is what makes it the thing your
    * eye lands on. `minWidth` keeps a single digit from squashing into a stripe.
+   * Orange-red, same as the tab and home badges: unread is always this colour.
    */
   badge: {
     minWidth: 24,
@@ -298,17 +303,17 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginRight: spacing.xs,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.flame,
   },
   badgeText: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.textInverse,
     textAlign: 'center',
   },
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xxl,
     marginBottom: spacing.md,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,7 +7,7 @@ import {
   type KeyboardTypeOptions,
   type TextInputProps,
 } from 'react-native';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 interface Props {
   label: string;
@@ -41,6 +41,8 @@ export function TextField({
   onSubmitEditing,
   returnKeyType,
 }: Props) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -57,7 +59,14 @@ export function TextField({
         editable={editable}
         onSubmitEditing={onSubmitEditing}
         returnKeyType={returnKeyType}
-        style={[styles.input, !!error && styles.inputError, !editable && styles.inputDisabled]}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[
+          styles.input,
+          focused && !error && styles.inputFocused,
+          !!error && styles.inputError,
+          !editable && styles.inputDisabled,
+        ]}
         accessibilityLabel={label}
         // Announce the error to screen readers, not just sighted users.
         accessibilityHint={error ?? helper}
@@ -76,21 +85,23 @@ const styles = StyleSheet.create({
   wrapper: { marginBottom: spacing.lg },
   label: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   input: {
     minHeight: MIN_TOUCH,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
     fontSize: fontSize.md,
+    fontFamily: FONT.regular,
     color: colors.text,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
+  inputFocused: { borderColor: colors.primaryDark },
   inputError: { borderColor: colors.danger },
   inputDisabled: { backgroundColor: colors.surfaceAlt, color: colors.textMuted },
   error: { fontSize: fontSize.xs, color: colors.danger, marginTop: spacing.xs },

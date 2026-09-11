@@ -7,7 +7,7 @@ import { TextField } from '@/components/TextField';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/supabase';
 import { validateEmail } from '@/lib/validation';
-import { colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, spacing } from '@/theme';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -45,7 +45,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen title="StudySync" subtitle="Find study partners on your courses at UI.">
+    <Screen title="StudySync" subtitle="Find study partners on your courses at UI." centered>
       <View style={styles.form}>
         <TextField
           label="Email"
@@ -107,6 +107,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.xl,
   },
-  footerText: { fontSize: fontSize.sm, color: colors.textMuted },
-  link: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
+  footerText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted },
+  link: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.primaryDark },
 });

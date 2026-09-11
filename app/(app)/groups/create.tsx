@@ -15,7 +15,7 @@ import { makeActionId } from '@/lib/ids';
 import { enqueue } from '@/lib/outbox';
 import { friendlyError } from '@/lib/supabase';
 import { validateGroupName } from '@/lib/validation';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { MyGroupRow } from '@/types/database';
 
 /**
@@ -254,15 +254,15 @@ export default function CreateGroupScreen() {
 const styles = StyleSheet.create({
   label: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   hint: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 18 },
   link: {
     fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.primary,
+    fontFamily: FONT.bold,
+    color: colors.primaryDark,
     marginTop: spacing.sm,
   },
   nameBlock: { marginTop: spacing.xl },
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   switchText: { flex: 1, paddingRight: spacing.md },
-  switchLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  switchLabel: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.lg },
   offlineNote: {
     fontSize: fontSize.xs,

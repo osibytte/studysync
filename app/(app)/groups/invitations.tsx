@@ -10,7 +10,7 @@ import { useInvitations } from '@/hooks/useInvitations';
 import { capacityLabel, displayName, isFull, isLive } from '@/lib/groupRules';
 import { respondInvitation } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { InvitationDetailRow } from '@/types/database';
 
 /**
@@ -83,7 +83,7 @@ export default function InvitationsScreen() {
       )}
 
       {loading && invitations.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : error && invitations.length === 0 ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : invitations.length === 0 ? (
@@ -165,20 +165,20 @@ const styles = StyleSheet.create({
   },
   card: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {
     flex: 1,
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     paddingRight: spacing.sm,
   },
-  cardCourse: { fontSize: fontSize.sm, color: colors.primary, marginTop: spacing.xs },
+  cardCourse: { fontSize: fontSize.sm, color: colors.primaryDark, marginTop: spacing.xs },
   cardMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
   cardWarn: {
     fontSize: fontSize.xs,

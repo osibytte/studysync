@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { notificationRoute, type InboxItem } from '@/lib/notificationRules';
-import { colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, spacing } from '@/theme';
 
 /**
  * The in-app inbox — what StudySync has told this student, newest first.
@@ -155,7 +155,7 @@ export default function NotificationsScreen() {
             onPress={() => router.push('/(app)/notification-settings')}
             style={unread > 0 ? styles.footerSecond : undefined}
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          {/* No back button: this is a tab, the bar below is the way out. */}
         </View>
       }
     >
@@ -172,7 +172,7 @@ export default function NotificationsScreen() {
       )}
 
       {loading && empty ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : error && empty ? (
         <View>
           <Text style={styles.error}>{error}</Text>
@@ -198,7 +198,7 @@ export default function NotificationsScreen() {
           onRefresh={() => void reload()}
           ListFooterComponent={
             loadingMore ? (
-              <ActivityIndicator color={colors.primary} style={styles.loader} />
+              <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
             ) : !hasMore && items.length > 6 ? (
               <Text style={styles.endNote}>That is everything.</Text>
             ) : null
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   dayHeader: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.textMuted,
     textTransform: 'uppercase',
     marginTop: spacing.md,

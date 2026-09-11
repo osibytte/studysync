@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 interface Props {
   label: string;
@@ -58,8 +58,8 @@ export function SwitchRow({
         value={shown}
         onValueChange={onChange}
         disabled={inactive}
-        trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
-        thumbColor={colors.background}
+        trackColor={{ false: colors.borderStrong, true: colors.accent }}
+        thumbColor={colors.surface}
         // iOS renders the "off" track as near-white by default, which on this
         // surface is invisible; both platforms get the same explicit colours.
         ios_backgroundColor={colors.borderStrong}
@@ -74,15 +74,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: MIN_TOUCH,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     marginBottom: spacing.sm,
   },
-  pressed: { backgroundColor: colors.surface },
+  pressed: { backgroundColor: colors.surfaceAlt },
   inactive: { opacity: 0.55 },
   textCol: { flex: 1, paddingRight: spacing.md },
-  label: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  label: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
   hint: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
 });

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
 import { deletedMessageText, formatClock } from '@/lib/chatRules';
 import type { TimelineMessageItem } from '@/lib/chatRules';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * One text message, and the fallback every other kind lands on.
@@ -128,21 +128,29 @@ const styles = StyleSheet.create({
   columnMine: { alignItems: 'flex-end' },
   sender: {
     fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: colors.textMuted,
+    fontFamily: FONT.semi,
+    color: colors.primaryDark,
     marginBottom: 2,
     marginLeft: spacing.xs,
   },
   bubble: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
     borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
-  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: radius.sm },
-  bubbleTheirs: { backgroundColor: colors.surface, borderBottomLeftRadius: radius.sm },
+  // primaryStrong is the deep end of periwinkle: white body text stays readable
+  // in daylight, which the lighter hero tint does not guarantee.
+  bubbleMine: { backgroundColor: colors.primaryStrong, borderBottomRightRadius: radius.sm },
+  bubbleTheirs: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderBottomLeftRadius: radius.sm,
+  },
   bubbleGone: { backgroundColor: colors.surfaceAlt },
   bubblePressed: { opacity: 0.75 },
-  body: { fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
+  body: { fontSize: fontSize.md, fontFamily: FONT.regular, color: colors.text, lineHeight: 22 },
   bodyMine: { color: colors.textInverse },
   bodyGone: { color: colors.textMuted, fontStyle: 'italic' },
   confirm: {

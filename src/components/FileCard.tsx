@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
 import { fileKind, formatFileSize } from '@/lib/chatRules';
 import type { FileKind } from '@/lib/chatRules';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type { GroupMaterialRow } from '@/types/database';
 
 /**
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.textMuted,
     letterSpacing: 0.5,
   },
@@ -232,20 +232,20 @@ const styles = StyleSheet.create({
     width: MIN_TOUCH,
     height: MIN_TOUCH,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileGone: { backgroundColor: colors.borderStrong },
+  tileGone: { backgroundColor: colors.surfaceAlt },
   tileText: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: colors.textInverse,
+    fontFamily: FONT.bold,
+    color: colors.primaryDark,
   },
   fileTextCol: { flex: 1 },
-  name: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  name: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.text },
   nameGone: { color: colors.textMuted, fontStyle: 'italic' },
-  detail: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
+  detail: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 2 },
 
   note: {
     fontSize: fontSize.sm,

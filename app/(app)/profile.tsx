@@ -18,7 +18,7 @@ import {
 import { enqueue } from '@/lib/outbox';
 import { friendlyError, supabase } from '@/lib/supabase';
 import { validateDepartment, validateFullName } from '@/lib/validation';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * Profile editing — name, department, availability, and a route to course
@@ -139,7 +139,7 @@ export default function ProfileScreen() {
             loading={saving}
             disabled={saving}
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} style={styles.back} />
+          {/* No back button: this is a tab, the bar below is the way out. */}
         </View>
       }
     >
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xl,
     marginBottom: spacing.md,
@@ -237,11 +237,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   courseTextCol: { flex: 1 },
-  courseCode: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  courseCode: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: 2 },
   manageCourses: { marginTop: spacing.sm },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md },
   status: { color: colors.success, fontSize: fontSize.sm, marginTop: spacing.md },
-  back: { marginTop: spacing.sm },
+
   signOut: { marginTop: spacing.xxl },
 });

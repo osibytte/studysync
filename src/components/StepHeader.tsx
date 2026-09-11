@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 interface Props {
   step: number;
@@ -22,7 +22,10 @@ export function StepHeader({ step, total }: Props) {
         {Array.from({ length: total }).map((_, i) => (
           <View
             key={i}
-            style={[styles.segment, i < step ? styles.segmentDone : styles.segmentTodo]}
+            style={[
+              styles.segment,
+              i < step ? styles.segmentDone : i === step ? styles.segmentCurrent : styles.segmentTodo,
+            ]}
           />
         ))}
       </View>
@@ -35,9 +38,15 @@ export function StepHeader({ step, total }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: { marginBottom: spacing.lg },
-  track: { flexDirection: 'row', marginBottom: spacing.xs },
-  segment: { flex: 1, height: 4, borderRadius: radius.pill, marginHorizontal: 2 },
+  track: { flexDirection: 'row', marginBottom: spacing.xs, gap: 4 },
+  segment: { flex: 1, height: 6, borderRadius: radius.pill },
+  // Done = lime, current = periwinkle, upcoming = sand.
   segmentDone: { backgroundColor: colors.accent },
+  segmentCurrent: { backgroundColor: colors.primary },
   segmentTodo: { backgroundColor: colors.surfaceAlt },
-  label: { fontSize: fontSize.xs, color: colors.textMuted, fontWeight: '600' },
+  label: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    fontFamily: FONT.semi,
+  },
 });

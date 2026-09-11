@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type { UserCourseWithDetail } from '@/types/database';
 
 interface Props {
@@ -48,15 +48,16 @@ export function CourseChips({ courses, selectedCourseId, onSelect }: Props) {
 const styles = StyleSheet.create({
   row: { paddingVertical: spacing.xs, gap: spacing.sm },
   chip: {
-    minHeight: MIN_TOUCH - 8,
+    minHeight: MIN_TOUCH,
     justifyContent: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
-  chipText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
-  chipTextActive: { color: colors.textInverse },
+  // Selected = lime with ink text, matching ChoiceChips and the primary button.
+  chipActive: { borderColor: colors.accent, backgroundColor: colors.accent },
+  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  chipTextActive: { color: colors.text },
 });

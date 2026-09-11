@@ -1,0 +1,412 @@
+/* ============================================================
+   StudySync redesign preview, shared styles (v2).
+   Based on the user's reference: paper background, periwinkle +
+   lime + orange-red, Baloo 2, pill buttons with thin borders
+   (lime = primary). These values mirror the tokens the React
+   Native app would get in src/theme.ts. No images, no emoji.
+   Icons come from a bundled vector icon font (@expo/vector-icons,
+   Feather set).
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #8B8BF5;        /* periwinkle: hero cards, filled states */
+  --primary-dark: #5B55D6;   /* links, active tab, readable periwinkle text */
+  --primary-soft: #EFEFFE;   /* tinted tiles */
+
+  --accent: #C9F169;         /* lime: primary buttons, selected chips */
+  --accent-deep: #567D1E;    /* readable lime for text on light tints */
+  --accent-soft: #F3FBE2;
+
+  --flame: #F2542D;          /* orange-red: badges, danger */
+  --flame-soft: #FFE9E1;
+
+  --bg: #F8F4EA;             /* warm paper app background */
+  --surface: #FFFFFF;
+  --surface-alt: #F3EEE1;
+
+  --ink: #23211A;            /* warm near-black text */
+  --muted: #8D8776;
+
+  --border: #E8E1CE;
+  --border-strong: #D8CFB6;
+
+  --success: #4C9A46;
+  --success-soft: #E9F6DF;
+  --danger: #F2542D;
+  --danger-soft: #FFE9E1;
+
+  --shadow-card: 0 1px 3px rgba(35, 33, 26, 0.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
+  background: #EDE7D9;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 16px 56px;
+  min-height: 100vh;
+}
+
+/* ---------- icons (Feather-style, matches @expo/vector-icons) ---------- */
+
+.ic {
+  width: 20px; height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  display: block;
+}
+.ic.lg { width: 22px; height: 22px; }
+.ic.sm { width: 17px; height: 17px; }
+
+/* ---------- phone frame ---------- */
+
+.phone {
+  width: 384px;
+  background: var(--bg);
+  border-radius: 38px;
+  box-shadow: 0 0 0 11px #221C3A, 0 30px 70px rgba(35, 33, 26, 0.28);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.caption {
+  color: #8A8371;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 22px;
+  text-align: center;
+  max-width: 340px;
+  line-height: 1.5;
+}
+
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sig { display: flex; gap: 3px; align-items: flex-end; }
+.sig i { display: block; width: 3px; background: var(--ink); border-radius: 1px; }
+.sig i:nth-child(1) { height: 5px; }
+.sig i:nth-child(2) { height: 8px; }
+.sig i:nth-child(3) { height: 11px; }
+.batt {
+  width: 22px; height: 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  position: relative;
+  margin-left: 8px;
+}
+.batt::after {
+  content: '';
+  position: absolute; inset: 1.5px; right: 5px;
+  background: var(--ink); border-radius: 1px;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 800px;
+}
+
+.content {
+  flex: 1;
+  padding: 14px 18px 26px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- tab bar: icon + label (Feather icons via
+   @expo/vector-icons in the app) ---------- */
+
+.tabbar {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: #FFFDF7;
+  padding: 10px 10px 20px;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  position: relative;
+  text-decoration: none;
+}
+.tab .ic { margin-bottom: 1px; }
+.tab.active { color: var(--primary-dark); font-weight: 700; }
+
+.tab .tabbadge {
+  position: absolute;
+  top: -4px;
+  right: calc(50% - 24px);
+  background: var(--flame);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* ---------- pill buttons, flat with thin borders ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 13px 22px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  background: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:active { transform: translateY(1px); filter: brightness(0.96); }
+
+.btn.secondary {
+  background: #fff;
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.btn.ghost { background: transparent; color: var(--primary-dark); }
+.btn.ghost:active { transform: none; opacity: 0.7; }
+
+.btn.danger { background: var(--flame); color: #fff; }
+
+.btn.small { padding: 10px 18px; font-size: 14px; }
+.btn.block { display: flex; width: 100%; }
+
+/* ---------- cards, pills, chips ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.row-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.row-card + .row-card { margin-top: 10px; }
+
+.row-main { flex: 1; min-width: 0; }
+.row-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.row-sub { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 500; margin-top: 3px; }
+.chev { color: var(--border-strong); font-size: 24px; font-weight: 700; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pill.active { background: var(--success-soft); color: var(--success); }
+.pill.forming { background: var(--primary-soft); color: var(--primary-dark); }
+.pill.dormant { background: var(--surface-alt); color: var(--muted); }
+
+.badge {
+  background: var(--flame);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chip {
+  border: 1.5px solid var(--border-strong);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.chip.selected { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.chip.dashed { border-style: dashed; color: var(--muted); }
+
+.tile {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.tile.mango { background: var(--flame-soft); color: var(--flame); }
+.tile.lime { background: var(--accent-soft); color: var(--accent-deep); }
+
+.section-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 22px 2px 10px;
+}
+.section-h h3 { font-size: 17px; font-weight: 700; }
+.section-h a { color: var(--primary-dark); font-weight: 700; font-size: 13px; text-decoration: none; }
+
+/* ---------- home header ---------- */
+
+.home-top { display: flex; justify-content: space-between; align-items: center; }
+.home-id { display: flex; align-items: center; gap: 11px; }
+.logo-tile {
+  width: 46px; height: 46px;
+  border-radius: 15px;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.home-id h1 { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.home-id .sub { color: var(--muted); font-size: 13.5px; font-weight: 500; margin-top: 1px; }
+
+.inbox {
+  position: relative;
+  width: 46px; height: 46px;
+  border-radius: 15px;
+  background: #fff;
+  border: 1.5px solid var(--border-strong);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.inbox .tabbadge { top: -6px; right: -7px; }
+
+.stats { display: flex; gap: 10px; margin-top: 20px; }
+.stat {
+  flex: 1;
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  padding: 13px 6px;
+  text-align: center;
+}
+.stat b { display: block; font-size: 22px; font-weight: 700; color: var(--primary-dark); }
+.stat span { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+.chiprow { display: flex; gap: 8px; overflow: hidden; }
+
+/* filled hero card (periwinkle), like the reference's colorful cards */
+
+.card.hero {
+  background: var(--primary);
+  border: none;
+  border-radius: 24px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+}
+.card.hero b { display: block; font-size: 17px; font-weight: 700; }
+.card.hero p { font-size: 13px; font-weight: 500; opacity: 0.85; margin-top: 2px; }
+.card.hero a {
+  background: #fff; color: var(--ink);
+  font-weight: 700; font-size: 13px; text-decoration: none;
+  padding: 8px 15px; border-radius: 999px; flex-shrink: 0;
+}
+.daydots { display: flex; gap: 5px; margin-top: 10px; }
+.daydots i { width: 14px; height: 14px; border-radius: 50%; background: rgba(255, 255, 255, 0.28); }
+.daydots i.on { background: var(--accent); }
+
+/* ---------- shared screen pieces ---------- */
+
+/* pill text field, like the reference search bar */
+.flabel { font-size: 13px; font-weight: 700; margin: 0 2px 6px; display: block; }
+.field {
+  width: 100%; background: #fff; border: 1.5px solid var(--border-strong);
+  border-radius: 999px; padding: 13px 18px;
+  font-family: inherit; font-size: 15px; font-weight: 500; color: var(--muted);
+}
+.fieldwrap { margin-top: 14px; }
+
+/* switch, lime when on */
+.switch { width: 52px; height: 32px; border-radius: 999px; background: var(--accent); position: relative; flex-shrink: 0; }
+.switch.off { background: var(--border-strong); }
+.switch i { position: absolute; top: 3px; right: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(35, 33, 26, 0.25); }
+.switch.off i { right: auto; left: 3px; }
+
+/* tappable list / settings row */
+.rowline {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 1.5px solid var(--border); border-radius: 18px;
+  padding: 14px 16px; text-decoration: none; color: inherit;
+}
+.rowline + .rowline { margin-top: 10px; }
+.rowline .rl-main { flex: 1; min-width: 0; }
+.rowline b { font-size: 15px; font-weight: 700; display: block; }
+.rowline .rl-sub { font-size: 12.5px; color: var(--muted); font-weight: 500; display: block; margin-top: 1px; }
+.rowline.danger b { color: var(--flame); }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--primary-soft); color: var(--primary-dark);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+
+.dayhead {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.6px; margin: 18px 2px 8px;
+}
+
+.notecard {
+  background: var(--surface-alt); border-radius: 16px;
+  padding: 12px 14px; font-size: 13px; font-weight: 500;
+  color: var(--muted); line-height: 1.5;
+}
+
+/* page header for stacked screens */
+.pagehead { display: flex; align-items: center; gap: 10px; }
+.pagehead h1 { font-size: 22px; font-weight: 700; flex: 1; }
+.circle-btn {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: #fff; border: 1.5px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); text-decoration: none; flex-shrink: 0;
+}
+
+/* unread dot on notification cards */
+.unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--flame); flex-shrink: 0; }

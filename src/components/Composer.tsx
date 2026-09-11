@@ -5,7 +5,7 @@ import {
   normaliseMessageBody,
   validateMessageBody,
 } from '@/lib/chatRules';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * The bar at the bottom of the chat: type a message, propose a study time, or
@@ -230,14 +230,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.background,
   },
-  proposeText: { fontSize: fontSize.lg, fontWeight: '600', color: colors.primary },
+  proposeText: { fontSize: fontSize.lg, fontFamily: FONT.semi, color: colors.primaryDark },
   /** Reads as held down while its menu is showing, so the × has a home. */
-  proposeOpen: { backgroundColor: colors.surface, borderColor: colors.primary },
+  proposeOpen: { backgroundColor: colors.surface, borderColor: colors.primaryDark },
   menu: {
     marginBottom: spacing.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
@@ -247,17 +247,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  menuLabel: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
-  menuDetail: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  menuLabel: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.text },
+  menuDetail: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 2 },
   send: {
     minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendText: { fontSize: fontSize.md, fontWeight: '600', color: colors.textInverse },
+  // Ink on lime: white would fail daylight contrast on this fill.
+  sendText: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.text },
   inactive: { opacity: 0.45 },
   pressed: { opacity: 0.85 },
   problem: { fontSize: fontSize.xs, color: colors.danger, marginBottom: spacing.xs },

@@ -19,7 +19,7 @@ import { useUserCourses } from '@/hooks/useUserCourses';
 import { canRequestToJoin, capacityLabel, isFull, seatsLeft } from '@/lib/groupRules';
 import { requestToJoin } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { DiscoverGroupRow } from '@/types/database';
 
 /**
@@ -96,7 +96,7 @@ export default function DiscoverScreen() {
       }
     >
       {coursesLoading && userCourses.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : userCourses.length === 0 ? (
         <View>
           <Text style={styles.emptyText}>
@@ -146,7 +146,7 @@ export default function DiscoverScreen() {
           )}
 
           {loading && groups.length === 0 ? (
-            <ActivityIndicator color={colors.primary} style={styles.loader} />
+            <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
           ) : error && groups.length === 0 ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : visible.length === 0 ? (
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  filterLabel: { fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
+  filterLabel: { fontSize: fontSize.sm, color: colors.text, fontFamily: FONT.semi },
   note: {
     fontSize: fontSize.xs,
     color: colors.textMuted,
@@ -234,19 +234,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: spacing.md,
   },
-  link: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary, marginTop: spacing.sm },
+  link: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark, marginTop: spacing.sm },
   card: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {
     flex: 1,
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     paddingRight: spacing.sm,
   },

@@ -10,7 +10,7 @@ import { useGroupDetail } from '@/hooks/useGroupDetail';
 import { canInvite, capacityLabel, displayName, isFull, isLive } from '@/lib/groupRules';
 import { searchStudents, sendInvitation } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { StudentSearchRow } from '@/types/database';
 
 /**
@@ -122,7 +122,7 @@ export default function InviteScreen() {
       footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
     >
       {detailLoading && !group ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : !allowed ? (
         <Text style={styles.emptyText}>{blockedReason()}</Text>
       ) : (
@@ -158,7 +158,7 @@ export default function InviteScreen() {
           )}
 
           {searching && results.length === 0 ? (
-            <ActivityIndicator color={colors.primary} style={styles.loader} />
+            <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
           ) : results.length === 0 ? (
             <Text style={styles.emptyText}>
               {searched
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowText: { flex: 1, paddingRight: spacing.sm },
-  rowName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  rowName: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
   rowMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
   rowButton: { paddingHorizontal: spacing.lg, borderRadius: radius.md },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md, lineHeight: 20 },

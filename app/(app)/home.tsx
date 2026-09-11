@@ -12,7 +12,7 @@ import { useNotificationBadge } from '@/hooks/useNotifications';
 import { useUnread } from '@/hooks/useUnread';
 import { useUserCourses } from '@/hooks/useUserCourses';
 import { countSelected, decodeAvailability, describeSelection } from '@/lib/availability';
-import { MIN_TOUCH, colors, fontSize, radius, spacing, typography } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing, typography } from '@/theme';
 
 /**
  * Home.
@@ -84,7 +84,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={syncing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />
+          <RefreshControl refreshing={syncing} onRefresh={() => void onRefresh()} tintColor={colors.primaryDark} />
         }
       >
         <View style={styles.greetingRow}>
@@ -169,7 +169,7 @@ export default function HomeScreen() {
         </View>
 
         {loading && userCourses.length === 0 ? (
-          <ActivityIndicator color={colors.primary} style={styles.loader} />
+          <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
         ) : userCourses.length === 0 ? (
           <Text style={styles.emptyText}>
             No courses yet. Tap Edit to add the courses you want partners for.
@@ -235,41 +235,45 @@ function Stat({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  greeting: { ...typography.title },
+  greeting: { ...typography.display },
   greetingRow: { flexDirection: 'row', alignItems: 'flex-start' },
   greetingCol: { flex: 1, paddingRight: spacing.md },
   bell: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
   bellPressed: { backgroundColor: colors.surfaceAlt },
-  bellLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.primary },
+  bellLabel: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.text },
+  // Unread count = orange-red pill with white text, same as the tab badge.
   bellCount: {
     marginLeft: spacing.xs,
     minWidth: 20,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.flame,
     alignItems: 'center',
   },
-  bellCountText: { fontSize: fontSize.xs, fontWeight: '700', color: colors.primary },
-  subtitle: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: spacing.xs },
+  bellCountText: { fontSize: fontSize.xs, fontFamily: FONT.bold, color: colors.textInverse },
+  subtitle: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted, marginTop: spacing.xs },
   nextCard: {
     marginTop: spacing.xl,
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  nextTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  nextTitle: { fontSize: fontSize.lg, fontFamily: FONT.bold, color: colors.text },
   nextBody: {
     fontSize: fontSize.sm,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
     lineHeight: 20,
     marginTop: spacing.sm,
@@ -277,14 +281,14 @@ const styles = StyleSheet.create({
   },
   inviteLine: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.primary,
+    fontFamily: FONT.semi,
+    color: colors.primaryDark,
     marginBottom: spacing.md,
   },
   // Same weight as the invitation line, plain text colour: informational, not a nudge.
   unreadLine: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.text,
     marginBottom: spacing.md,
   },
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xxl,
     marginBottom: spacing.md,
@@ -305,30 +309,56 @@ const styles = StyleSheet.create({
   // Same look, but the wrapping row already supplies the vertical spacing.
   sectionHeaderInline: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
   },
-  editLink: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
+  editLink: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.primaryDark },
   loader: { marginVertical: spacing.lg },
-  emptyText: { fontSize: fontSize.sm, color: colors.textMuted, lineHeight: 20 },
+  emptyText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted, lineHeight: 20 },
   courseCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
   },
   courseTextCol: { flex: 1 },
-  courseCode: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
-  courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: 2 },
-  availCard: { padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md },
-  availText: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
-  availCount: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs },
-  statsRow: { flexDirection: 'row', marginTop: spacing.xl },
-  stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: fontSize.xl, fontWeight: '700', color: colors.primary },
-  statLabel: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  courseCode: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
+  courseTitle: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.text, marginTop: 2 },
+  // The availability card is the one hero surface on home: periwinkle with
+  // white text, matching the tab-active and chat-bubble family.
+  availCard: {
+    padding: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+  },
+  availText: {
+    fontSize: fontSize.md,
+    fontFamily: FONT.semi,
+    color: colors.textInverse,
+    lineHeight: 22,
+  },
+  availCount: {
+    fontSize: fontSize.xs,
+    fontFamily: FONT.regular,
+    color: colors.textInverse,
+    opacity: 0.85,
+    marginTop: spacing.xs,
+  },
+  statsRow: { flexDirection: 'row', marginTop: spacing.xl, gap: spacing.sm },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+  },
+  statValue: { fontSize: fontSize.xl, fontFamily: FONT.bold, color: colors.primaryDark },
+  statLabel: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.textMuted, marginTop: 2 },
   signOut: { marginTop: spacing.xxl },
 });

@@ -12,7 +12,7 @@ import {
   setDay,
   toggleSlot,
 } from '@/lib/availability';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 interface Props {
   grid: Grid;
@@ -105,6 +105,7 @@ export function AvailabilityGrid({ grid, onChange }: Props) {
             onPress={() => onChange(new Array(DAYS_PER_WEEK * SLOTS_PER_DAY).fill(false))}
             accessibilityRole="button"
             accessibilityLabel="Clear all availability"
+            hitSlop={8}
             style={styles.clearButton}
           >
             <Text style={styles.clearText}>Clear all</Text>
@@ -127,37 +128,42 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', marginBottom: spacing.xs },
   row: { flexDirection: 'row', marginBottom: spacing.xs },
   slotLabelCell: { width: 76, justifyContent: 'center', paddingRight: spacing.xs },
-  slotLabel: { fontSize: fontSize.xs, fontWeight: '600', color: colors.text },
-  slotHint: { fontSize: 10, color: colors.textMuted },
+  slotLabel: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.text },
+  slotHint: { fontSize: 10, fontFamily: FONT.regular, color: colors.textMuted },
   dayHeaderCell: {
     flex: 1,
     marginHorizontal: 2,
     paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayHeaderText: { fontSize: fontSize.xs, fontWeight: '700', color: colors.textMuted },
-  dayHeaderTextActive: { color: colors.primary },
+  dayHeaderText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.textMuted },
+  dayHeaderTextActive: { color: colors.primaryDark },
   cell: {
     flex: 1,
     height: 40,
     marginHorizontal: 2,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.sm + 2,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Selected = lime with an ink check, same pair as the primary button.
   cellActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  cellMark: { color: colors.primary, fontSize: fontSize.sm, fontWeight: '700' },
+  cellMark: { color: colors.text, fontSize: fontSize.sm, fontFamily: FONT.bold },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  summary: { flex: 1, fontSize: fontSize.xs, color: colors.textMuted },
-  clearButton: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
-  clearText: { fontSize: fontSize.xs, fontWeight: '600', color: colors.primary },
+  summary: { flex: 1, fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted },
+  clearButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  clearText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.primaryDark },
 });

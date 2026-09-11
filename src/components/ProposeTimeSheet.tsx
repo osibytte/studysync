@@ -15,7 +15,7 @@ import {
   sessionWhenLabel,
   validateSessionProposal,
 } from '@/lib/chatRules';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * "Propose a study time", as chips rather than a native picker.
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  title: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
   close: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
   label: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.text,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   chipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   chipPressed: { opacity: 0.8 },
-  chipText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.textMuted },
+  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textMuted },
   chipTextActive: { color: colors.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   slot: {
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   slotPast: { backgroundColor: colors.surfaceAlt, borderColor: colors.surfaceAlt },
   slotPastText: { color: colors.borderStrong, textDecorationLine: 'line-through' },
   fields: { marginTop: spacing.lg },
-  preview: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  preview: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
   problem: { fontSize: fontSize.xs, color: colors.danger, marginTop: spacing.xs },
   hint: {
     fontSize: fontSize.xs,

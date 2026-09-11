@@ -12,7 +12,7 @@ import {
   waitingOnLabel,
   yesStillNeeded,
 } from '@/lib/chatRules';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type {
   GroupSessionRow,
   SessionAttendeeRow,
@@ -149,7 +149,7 @@ export function SessionCard({
                 ]}
               >
                 {spinning ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
+                  <ActivityIndicator size="small" color={colors.primaryDark} />
                 ) : (
                   <Text style={[styles.answerText, active && styles.answerTextActive]}>
                     {SESSION_RESPONSE_LABEL[response]}
@@ -188,7 +188,7 @@ export function SessionCard({
       {attendeesOpen && (
         <View style={styles.attendees}>
           {attendeesLoading && attendees.length === 0 ? (
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.primaryDark} />
           ) : attendees.length === 0 ? (
             <Text style={styles.note}>
               Nobody could be looked up just now. This list needs a connection.
@@ -297,24 +297,24 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.textMuted,
     letterSpacing: 0.5,
   },
-  status: { fontSize: fontSize.xs, fontWeight: '700', color: colors.warning },
+  status: { fontSize: fontSize.xs, fontFamily: FONT.bold, color: colors.warning },
   statusConfirmed: { color: colors.success },
   statusCancelled: { color: colors.textMuted },
 
   when: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.sm,
   },
   detail: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
   tally: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.text,
     marginTop: spacing.sm,
   },
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   answerActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   answerDisabled: { opacity: 0.5 },
   answerPressed: { opacity: 0.7 },
-  answerText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.textMuted },
+  answerText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textMuted },
   answerTextActive: { color: colors.text },
 
   note: {
@@ -355,8 +355,8 @@ const styles = StyleSheet.create({
   },
   disclosureText: {
     fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.primaryMuted,
+    fontFamily: FONT.semi,
+    color: colors.primaryDark,
   },
   attendees: {
     paddingTop: spacing.sm,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   attendeeName: { flex: 1, fontSize: fontSize.sm, color: colors.text },
-  attendeeAnswer: { fontSize: fontSize.xs, fontWeight: '600', color: colors.textMuted },
+  attendeeAnswer: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.textMuted },
   answerYes: { color: colors.success },
   answerNo: { color: colors.danger },
   waiting: {

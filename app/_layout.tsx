@@ -1,5 +1,13 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  Baloo2_400Regular,
+  Baloo2_500Medium,
+  Baloo2_600SemiBold,
+  Baloo2_700Bold,
+  Baloo2_800ExtraBold,
+} from '@expo-google-fonts/baloo-2';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,10 +16,16 @@ import { NetworkProvider } from '@/context/NetworkContext';
 import { colors } from '@/theme';
 
 /**
- * Root layout: providers, then the auth-aware router gate.
+ * Root layout: Baloo 2, providers, then the auth-aware router gate.
  */
 
-function RouteGuard({ children }: { children: React.ReactNode }) {
+function RouteGuard({
+  children,
+  fontsLoaded,
+}: {
+  children: React.ReactNode;
+  fontsLoaded: boolean;
+}) {
   const { session, profile, initialising } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -47,10 +61,12 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     if (inAuthFlow || inOnboarding) router.replace('/(app)/home');
   }, [initialising, session, profile, segments, router]);
 
-  if (initialising) {
+  // Fonts must be ready before any screen renders, or the first paint is in
+  // the wrong typeface and reflows once Baloo 2 lands.
+  if (initialising || !fontsLoaded) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primaryDark} />
       </View>
     );
   }
@@ -59,12 +75,20 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Baloo2_400Regular,
+    Baloo2_500Medium,
+    Baloo2_600SemiBold,
+    Baloo2_700Bold,
+    Baloo2_800ExtraBold,
+  });
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <AuthProvider>
         <NetworkProvider>
-          <RouteGuard>
+          <RouteGuard fontsLoaded={fontsLoaded}>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(onboarding)" />

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create a group · StudySync preview</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  .toggle { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .toggle .rl-main b { font-size: 15px; font-weight: 700; display: block; }
+  .toggle .rl-main span { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span style="display:flex; align-items:center">
+        <span class="sig"><i></i><i></i><i></i></span>
+        <span class="batt"></span>
+      </span>
+    </div>
+    <div class="screen">
+      <div class="content">
+        <div class="pagehead">
+          <a class="circle-btn" href="groups.html" aria-label="Back">
+            <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </a>
+          <h1>Create a group</h1>
+        </div>
+
+        <div class="fieldwrap" style="margin-top:20px">
+          <label class="flabel">Group name</label>
+          <div class="field">e.g. MTH 111 Squad</div>
+        </div>
+
+        <div class="section-h" style="margin-top:20px">
+          <h3>Course</h3>
+        </div>
+        <div class="chiprow">
+          <span class="chip selected">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+        </div>
+
+        <div class="toggle">
+          <div class="rl-main">
+            <b>Anyone can join</b>
+            <span>Off means you approve each request</span>
+          </div>
+          <span class="switch off"><i></i></span>
+        </div>
+
+        <div style="margin-top:26px">
+          <button class="btn block">Create group</button>
+        </div>
+        <div class="notecard" style="margin-top:14px">Works offline. It sends as soon as you are back online.</div>
+      </div>
+    </div>
+  </div>
+  <p class="caption">Create a group.</p>
+</body>
+</html>

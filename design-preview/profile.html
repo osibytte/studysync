@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile · StudySync preview</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  .me { display: flex; align-items: center; gap: 14px; padding: 18px 16px; }
+  .me .avatar { width: 58px; height: 58px; font-size: 18px; }
+  .me b { font-size: 18px; font-weight: 700; display: block; }
+  .me span { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span style="display:flex; align-items:center">
+        <span class="sig"><i></i><i></i><i></i></span>
+        <span class="batt"></span>
+      </span>
+    </div>
+    <div class="screen">
+      <div class="content">
+        <h1 style="font-size:24px; font-weight:700">Profile</h1>
+
+        <div class="card me" style="margin-top:14px">
+          <span class="avatar">AD</span>
+          <div>
+            <b>Ada Dimoko</b>
+            <span>Computer Science</span>
+          </div>
+        </div>
+
+        <div class="section-h">
+          <h3>Your courses</h3>
+          <a href="#">Edit</a>
+        </div>
+        <div class="chiprow">
+          <span class="chip selected">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+        </div>
+
+        <div class="section-h">
+          <h3>Availability</h3>
+          <a href="onboarding.html">Edit</a>
+        </div>
+        <div class="card hero">
+          <div>
+            <b>13 free slots this week</b>
+            <p>Used when matching you with others.</p>
+            <div class="daydots">
+              <i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-h"><h3>More</h3></div>
+        <a class="rowline" href="settings.html">
+          <div class="rl-main"><b>Notification settings</b></div>
+          <span class="chev">›</span>
+        </a>
+        <a class="rowline" href="#">
+          <div class="rl-main"><b>Edit courses</b></div>
+          <span class="chev">›</span>
+        </a>
+        <a class="rowline danger" href="#">
+          <div class="rl-main"><b>Sign out</b></div>
+        </a>
+      </div>
+
+      <div class="tabbar">
+        <a class="tab" href="home.html">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          Home
+        </a>
+        <a class="tab" href="groups.html">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Groups
+        </a>
+        <a class="tab" href="notifications.html">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          Inbox
+        </a>
+        <a class="tab active" href="#">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Profile
+        </a>
+      </div>
+    </div>
+  </div>
+  <p class="caption">Profile.</p>
+</body>
+</html>

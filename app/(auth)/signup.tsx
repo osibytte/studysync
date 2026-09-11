@@ -12,7 +12,7 @@ import {
   validatePassword,
   validatePasswordConfirm,
 } from '@/lib/validation';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 export default function SignupScreen() {
   const { signUp } = useAuth();
@@ -62,7 +62,7 @@ export default function SignupScreen() {
 
   if (awaitingConfirmation) {
     return (
-      <Screen title="Check your email">
+      <Screen title="Check your email" centered>
         <View style={styles.noticeBox}>
           <Text style={styles.noticeText}>
             We sent a confirmation link to {email.trim().toLowerCase()}. Tap the link,
@@ -78,6 +78,7 @@ export default function SignupScreen() {
     <Screen
       title="Create your account"
       subtitle="Takes about a minute. You'll pick your courses next."
+      centered
     >
       <View style={styles.form}>
         <TextField
@@ -157,13 +158,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.xl,
   },
-  footerText: { fontSize: fontSize.sm, color: colors.textMuted },
-  link: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
+  footerText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted },
+  link: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.primaryDark },
   noticeBox: {
     backgroundColor: colors.accentSoft,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.lg,
     marginBottom: spacing.xl,
   },
-  noticeText: { fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
+  noticeText: { fontSize: fontSize.md, fontFamily: FONT.regular, color: colors.text, lineHeight: 22 },
 });

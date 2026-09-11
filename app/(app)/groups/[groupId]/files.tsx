@@ -18,7 +18,7 @@ import {
 } from '@/lib/chatRules';
 import { displayName, isCreator } from '@/lib/groupRules';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, spacing } from '@/theme';
 import type { GroupMaterialRow } from '@/types/database';
 
 /**
@@ -178,7 +178,7 @@ export default function GroupFilesScreen() {
       )}
 
       {loading && materials.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : error && materials.length === 0 ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : materials.length === 0 ? (

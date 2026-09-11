@@ -23,7 +23,7 @@ import {
 import { createGroup, findGroup, requestToJoin, sendInvitation } from '@/lib/groups';
 import { makeActionId } from '@/lib/ids';
 import { friendlyError } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { GroupStatus } from '@/types/database';
 import type { FindGroupResponse, ScoredGroup, ScoredStudent } from '@/types/matching';
 
@@ -153,7 +153,7 @@ export default function MatchScreen() {
       footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
     >
       {coursesLoading && userCourses.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : userCourses.length === 0 ? (
         <View>
           <Text style={styles.emptyText}>
@@ -348,35 +348,35 @@ const styles = StyleSheet.create({
   },
   link: {
     fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.primary,
+    fontFamily: FONT.bold,
+    color: colors.primaryDark,
     marginTop: spacing.sm,
   },
   sectionHeader: {
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginTop: spacing.xl,
   },
   card: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
+    padding: spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {
     flex: 1,
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     paddingRight: spacing.sm,
   },
   badge: {
     fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: colors.primary,
+    fontFamily: FONT.bold,
+    color: colors.primaryDark,
     backgroundColor: colors.accentSoft,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -388,11 +388,11 @@ const styles = StyleSheet.create({
   cardButton: { marginTop: spacing.md },
   warnCard: {
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
   },
-  warnTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text },
+  warnTitle: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.text },
   warnBody: {
     fontSize: fontSize.xs,
     color: colors.textMuted,

@@ -23,7 +23,7 @@ import {
 } from '@/lib/groupRules';
 import { enqueue } from '@/lib/outbox';
 import { friendlyError, isNetworkError, supabase } from '@/lib/supabase';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type { Course, Proficiency, UserCourseWithDetail } from '@/types/database';
 
 interface Props {
@@ -340,7 +340,7 @@ export function CoursePicker({
 
       {coursesLoading && courses.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={colors.primaryDark} />
         </View>
       ) : coursesError && courses.length === 0 ? (
         <View style={styles.centered}>
@@ -387,7 +387,7 @@ export function CoursePicker({
                     </Text>
                   </View>
                   {busy ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator size="small" color={colors.primaryDark} />
                   ) : (
                     <View style={[styles.checkbox, selected && styles.checkboxOn]}>
                       {selected && <Text style={styles.checkMark}>✓</Text>}
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   ratingLabel: {
     fontSize: fontSize.sm,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: colors.text,
     marginBottom: spacing.sm,
   },
@@ -513,10 +513,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     marginBottom: spacing.sm,
   },
-  optionOn: { borderColor: colors.primary, borderWidth: 2 },
+  optionOn: { borderColor: colors.primaryDark, borderWidth: 2 },
   optionText: { flex: 1, paddingLeft: spacing.sm },
-  optionLabel: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
-  optionLabelOn: { color: colors.primary },
+  optionLabel: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  optionLabelOn: { color: colors.primaryDark },
   hint: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
   radio: {
     width: 22,
@@ -533,10 +533,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   rowText: { flex: 1, paddingRight: spacing.md },
-  code: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  code: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   title: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
   checkbox: {
     width: 26,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  checkMark: { color: colors.primary, fontWeight: '700', fontSize: fontSize.sm },
+  checkMark: { color: colors.primaryDark, fontFamily: FONT.bold, fontSize: fontSize.sm },
   centered: {
     flex: 1,
     alignItems: 'center',

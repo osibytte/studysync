@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { notificationWhenLabel } from '@/lib/notificationRules';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 import type { Notification } from '@/types/database';
 
 interface Props {
@@ -86,30 +86,42 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
-  cardUnread: { borderColor: colors.borderStrong, backgroundColor: colors.surface },
-  unreadBar: { width: 4, backgroundColor: colors.accent },
+  cardUnread: { borderColor: colors.borderStrong },
+  unreadBar: { width: 4, backgroundColor: colors.flame },
   body: { flex: 1, padding: spacing.md },
   pressed: { backgroundColor: colors.surfaceAlt },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  title: { flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: colors.text },
-  titleRead: { color: colors.textMuted },
+  title: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontFamily: FONT.semi,
+    color: colors.text,
+  },
+  titleRead: { color: colors.textMuted, fontFamily: FONT.regular },
   newPill: {
     marginLeft: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.flameSoft,
   },
-  newPillText: { fontSize: fontSize.xs, fontWeight: '700', color: colors.warning },
-  text: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20, marginTop: spacing.xs },
+  newPillText: { fontSize: fontSize.xs, fontFamily: FONT.bold, color: colors.flame },
+  text: {
+    fontSize: fontSize.sm,
+    fontFamily: FONT.regular,
+    color: colors.text,
+    lineHeight: 20,
+    marginTop: spacing.xs,
+  },
   textRead: { color: colors.textMuted },
-  when: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.xs },
+  when: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: spacing.xs },
   dismiss: {
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
@@ -117,5 +129,5 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.border,
   },
   dismissDisabled: { opacity: 0.4 },
-  dismissText: { fontSize: fontSize.xs, fontWeight: '600', color: colors.primary },
+  dismissText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.primaryDark },
 });

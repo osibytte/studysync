@@ -1,43 +1,63 @@
 /**
  * Design tokens.
  *
- * Deliberately small and flat. Every screen imports from here so that a
- * spacing or colour change is one edit, not twelve.
+ * Every screen imports from here so that a spacing or colour change is one
+ * edit, not twelve. The look: warm paper background, periwinkle + lime +
+ * orange-red accents, Baloo 2 throughout.
  *
  * Constraints driving these choices:
  *   - Entry-level Android screens, often used in bright daylight, so contrast
- *     is generous rather than fashionable-grey.
- *   - No images, gradients, or shadows-heavy styling: the data-usage rule bans
- *     decorative media, and heavy shadows cost frames on low-end GPUs.
+ *     is generous rather than fashionable-grey. Body text is never white on
+ *     lime or light periwinkle; ink (#23211A) carries text on bright fills.
+ *   - Lime (accent) marks the one primary action per screen, white pills with
+ *     sand borders for the rest. Orange-red (flame) is badges and danger.
+ *   - Icons come from the bundled @expo/vector-icons font (Feather set).
+ *     No emoji: glyphs are missing on exactly the older Android builds this
+ *     app is aimed at.
  *   - Touch targets never below 44pt, since the availability grid is 28 small
  *     targets and mis-taps there are the fastest way to lose a student.
  */
 
 export const colors = {
-  /** Deep navy — headers, primary buttons. Reads as "study", not "social". */
-  primary: '#12263A',
-  primaryMuted: '#2E4A66',
-  /** Warm amber accent for selected states. High contrast on both bg + navy. */
-  accent: '#E8A33D',
-  accentSoft: '#FDF1DC',
+  /** Periwinkle: hero cards, filled surfaces, active tab. */
+  primary: '#8B8BF5',
+  /** Readable periwinkle for links and icons on paper. */
+  primaryDark: '#5B55D6',
+  primaryMuted: '#5B55D6',
+  primarySoft: '#EFEFFE',
+  /** Deep enough periwinkle to carry white body text (chat bubbles). */
+  primaryStrong: '#6E6AE6',
 
-  background: '#FFFFFF',
-  surface: '#F6F7F9',
-  surfaceAlt: '#EDEFF3',
+  /** Lime: the primary action, selected states, done marks. */
+  accent: '#C9F169',
+  /** Lime-family text that stays readable on light tints. */
+  accentDeep: '#567D1E',
+  accentSoft: '#F3FBE2',
 
-  text: '#12263A',
-  textMuted: '#5B6B7C',
+  /** Orange-red: badges, alerts, destructive actions. */
+  flame: '#F2542D',
+  flameSoft: '#FFE9E1',
+
+  background: '#F8F4EA',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F3EEE1',
+
+  text: '#23211A',
+  textMuted: '#8D8776',
   textInverse: '#FFFFFF',
 
-  border: '#D5DBE2',
-  borderStrong: '#9FAAB7',
+  border: '#E8E1CE',
+  borderStrong: '#D8CFB6',
 
-  success: '#1E7A44',
-  danger: '#C0392B',
-  warning: '#B7791F',
+  success: '#4C9A46',
+  successSoft: '#E9F6DF',
+  danger: '#F2542D',
+  dangerSoft: '#FFE9E1',
+  /** Darkened just enough that white banner text keeps AA contrast. */
+  warning: '#9C6712',
 
-  /** Offline banner — noticeable without being alarming. */
-  offline: '#5B6B7C',
+  /** Offline banner: grey, noticeable without being alarming. */
+  offline: '#5C574A',
 } as const;
 
 export const spacing = {
@@ -50,9 +70,10 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 16,
+  sm: 8,
+  md: 14,
+  lg: 20,
+  xl: 24,
   pill: 999,
 } as const;
 
@@ -68,30 +89,53 @@ export const fontSize = {
 /** Minimum tappable dimension. Do not go below this anywhere. */
 export const MIN_TOUCH = 44;
 
+/** Baloo 2, loaded once in app/_layout.tsx. Never use a raw family string. */
+export const FONT = {
+  regular: 'Baloo2_400Regular',
+  medium: 'Baloo2_500Medium',
+  semi: 'Baloo2_600SemiBold',
+  bold: 'Baloo2_700Bold',
+  extra: 'Baloo2_800ExtraBold',
+} as const;
+
+/** Soft card shadow: perceptible depth without GPU cost on low-end devices. */
+export const shadowCard = {
+  shadowColor: '#23211A',
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+} as const;
+
 export const typography = {
+  display: {
+    fontSize: 28,
+    fontFamily: FONT.bold,
+    color: colors.text,
+  },
   title: {
     fontSize: fontSize.xl,
-    fontWeight: '700' as const,
+    fontFamily: FONT.bold,
     color: colors.text,
   },
   subtitle: {
     fontSize: fontSize.md,
-    fontWeight: '400' as const,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
   },
   label: {
     fontSize: fontSize.sm,
-    fontWeight: '600' as const,
+    fontFamily: FONT.semi,
     color: colors.text,
   },
   body: {
     fontSize: fontSize.md,
-    fontWeight: '400' as const,
+    fontFamily: FONT.regular,
     color: colors.text,
   },
   caption: {
     fontSize: fontSize.xs,
-    fontWeight: '400' as const,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
   },
 } as const;

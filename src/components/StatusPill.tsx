@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { STATUS_LABEL } from '@/lib/groupRules';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, fontSize, radius, spacing, colors } from '@/theme';
 import type { GroupStatus } from '@/types/database';
 
 /**
@@ -22,24 +22,24 @@ export function StatusPill({ status }: { status: GroupStatus }) {
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
-  text: { fontSize: fontSize.xs, fontWeight: '700' },
+  text: { fontSize: fontSize.xs, fontFamily: FONT.semi },
 });
 
 const toneStyles: Record<GroupStatus, { backgroundColor: string }> = {
-  forming: { backgroundColor: colors.accentSoft },
-  active: { backgroundColor: '#E3F1E8' },
+  forming: { backgroundColor: colors.primarySoft },
+  active: { backgroundColor: colors.successSoft },
   dormant: { backgroundColor: colors.surfaceAlt },
   archived: { backgroundColor: colors.surfaceAlt },
   disbanded: { backgroundColor: colors.surfaceAlt },
 };
 
 const toneText: Record<GroupStatus, { color: string }> = {
-  forming: { color: colors.warning },
+  forming: { color: colors.primaryDark },
   active: { color: colors.success },
   dormant: { color: colors.textMuted },
   archived: { color: colors.textMuted },

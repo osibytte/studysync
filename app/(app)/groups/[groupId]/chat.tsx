@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Feather } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   FlatList,
@@ -51,7 +52,7 @@ import { makeActionId } from '@/lib/ids';
 import { enqueue, pendingActions } from '@/lib/outbox';
 import { askAboutReminders, refreshReminders } from '@/lib/reminders';
 import { friendlyError } from '@/lib/supabase';
-import { MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
 import type {
   GroupMaterialRow,
   GroupSessionRow,
@@ -731,9 +732,10 @@ export default function ChatScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          hitSlop={8}
           style={styles.back}
         >
-          <Text style={styles.backText}>‹</Text>
+          <Feather name="chevron-left" size={26} color={colors.primaryDark} />
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -747,9 +749,6 @@ export default function ChatScreen() {
         {/*
           The second place a file can be reached from, and the one that matters
           most: files are shared here, so "where did that PDF go" is asked here.
-          A word rather than an icon, for the reason `FileCard`'s tile letters
-          give — there is no icon set installed, and an emoji glyph is missing on
-          exactly the older Android builds this app is aimed at.
         */}
         {!!gid && (
           <Pressable
@@ -776,7 +775,7 @@ export default function ChatScreen() {
       )}
 
       {loading && messages.length === 0 ? (
-        <ActivityIndicator color={colors.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       ) : timeline.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>
@@ -801,7 +800,7 @@ export default function ChatScreen() {
           onEndReachedThreshold={0.4}
           ListFooterComponent={
             loadingOlder ? (
-              <ActivityIndicator color={colors.primary} style={styles.older} />
+              <ActivityIndicator color={colors.primaryDark} style={styles.older} />
             ) : !hasMore && messages.length > 0 ? (
               <Text style={styles.start}>The beginning of this conversation</Text>
             ) : null
@@ -827,9 +826,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   back: { width: 32, height: 44, alignItems: 'flex-start', justifyContent: 'center' },
-  backText: { fontSize: 28, lineHeight: 30, color: colors.primary },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  headerTitle: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
   headerMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
   /** Same 44pt as the Back target opposite it, so the header row stays even. */
   headerAction: {
@@ -837,7 +835,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: spacing.sm,
   },
-  headerActionText: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  headerActionText: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
   banner: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
@@ -857,7 +855,7 @@ const styles = StyleSheet.create({
   day: { alignItems: 'center', marginVertical: spacing.md },
   dayText: {
     fontSize: fontSize.xs,
-    fontWeight: '600',
+    fontFamily: FONT.semi,
     color: colors.textMuted,
     backgroundColor: colors.surfaceAlt,
     paddingHorizontal: spacing.md,
