@@ -1,5 +1,6 @@
 -- ============================================================================
--- StudySync — seed 20 students across 10 courses, all applied to the match pool.
+-- StudySync — seed 36 students across 10 courses. No groups, and by default
+-- nobody joins the match pool either (c_apply below).
 --
 -- This REPLACES the earlier one-course draft of this file. That version was
 -- never run against the live project (no seed users existed) and could not
@@ -7,38 +8,42 @@
 -- 0009 dropped — matching is course + availability only now.
 --
 -- WHAT IT DOES (idempotent — safe to re-run):
---   1. 20 auth.users + public.users profiles, with real departments and a
+--   1. 36 auth.users + public.users profiles, with real departments and a
 --      timezone. Every student can actually log in: the password is
 --      c_password below and the email is confirmed. An auth.identities row is
 --      upserted per student too — without it GoTrue's password grant fails
 --      with a 500 for hand-inserted users.
 --   2. Each enrols in 3 of the ten 500-level courses in c_courses (migration
 --      0026), always inside their own department:
---        students  1–10  Computer Science         -> CSC 501 + two more
---        students 11–20  Agricultural Engineering -> AGE 501 + two more
---      Both departments use the same pattern, so their pools mirror:
---        x01: 10   x03: 7   x05: 5   x07: 5   x09: 3
---      Every pool holds at least three, so each course can form a group.
+--        students  1–18  Computer Science         -> CSC 501 + two more
+--        students 19–36  Agricultural Engineering -> AGE 501 + two more
+--      The second and third courses rotate through six pairs of x03/x05/x07/x09,
+--      so both departments end up with the same enrolment per course:
+--        x01: 18   x03: 9   x05: 9   x07: 9   x09: 9
 --   3. Availability is ALL EIGHT WEEKEND SLOTS plus two or three week nights
---      per student (six patterns rotate through the twenty), so every pair
+--      per student (six patterns rotate through the thirty-six), so every pair
 --      shares at least the whole weekend and the night patterns give the
 --      schedule score something to differentiate on.
---   4. All 20 apply to be matched on every course they take — through the real
---      public.request_matching(), not by writing applied_at directly, so the
+--   4. ONLY WHEN c_apply IS TRUE: all apply to be matched on every course
+--      they take — through the real public.request_matching(), not by writing
+--      applied_at directly, so the
 --      window / rating / availability guards actually execute. request_matching
 --      resolves the caller via auth.uid(), which reads the `request.jwt.claim.sub`
 --      GUC, so the loop lends each student their identity with set_config for
 --      the duration of the call.
---   5. Opens a registration window first if none is currently open. (If a
+--   5. ONLY WHEN c_apply IS TRUE: opens a registration window first if none
+--      is currently open. (If a
 --      FUTURE window exists that overlaps the proposed 7 days, open_matching_window
 --      refuses with its own overlap message and the whole seed rolls back.)
 --
 -- NOT seeded, on purpose:
+--   * No match-pool applications unless c_apply is flipped to true, so a
+--     matching run has nobody to place.
 --   * No topics — they do not exist since 0009.
 --   * No device_push_tokens — the send-push sweep must never see fake Expo
 --     tokens; 'group_matched' notifications will sit in the in-app inbox.
---   * No groups — the pool is left for run-batch-matching (service_role) to
---     consume.
+--   * No groups. Even with c_apply on, the pool waits for run-batch-matching
+--     (service_role), which only runs when someone triggers it.
 --
 -- PREREQUISITES: migrations through 0026 applied; the ten courses exist
 -- (migration 0026, mirrored in supabase/seed/0003_seed_courses.sql).
@@ -49,7 +54,7 @@
 -- LOGIN: <firstname>.<lastname>@seed.invalid  /  studysync
 --        e.g. adaeze.okafor@seed.invalid — to eyeball the applied state in-app.
 --
--- ROLLBACK (removes the 20 students and everything they own, cascading):
+-- ROLLBACK (removes the 36 students and everything they own, cascading):
 --   delete from auth.users where email like '%@seed.invalid';
 -- ============================================================================
 
@@ -62,6 +67,9 @@ declare
   c_email_host constant text   := '@seed.invalid';
   c_password   constant text   := 'studysync';       -- login password for every seed student
   c_timezone   constant text   := 'Africa/Lagos';
+  -- false: profiles and enrolments only. true: also apply every enrolment to
+  -- the match pool through request_matching (opening a window if needed).
+  c_apply      constant boolean := false;
 
   -- Availability encoding (must mirror src/lib/availability.ts):
   --   bit index = day * 4 + slot; day 0=Mon .. 6=Sun;
@@ -109,36 +117,52 @@ begin
    order by w.opens_at
    limit 1;
 
-  if v_window_id is null then
+  if c_apply and v_window_id is null then
     v_window_id := public.open_matching_window(
       'Seed matching window', now(), now() + interval '7 days');
   end if;
 
-  -- ---- the 20 students -------------------------------------------------------
+  -- ---- the 36 students -------------------------------------------------------
   -- night_days = weekdays that get a NIGHT session on top of the full weekend;
   -- day 0=Mon .. 4=Fri, so the bit index added is day*4 + 3.
   for s in
     select * from (values
-      ( 1,'Adaeze Okafor',      'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[0,2],    1),
-      ( 2,'Chinedu Eze',        'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[1,3],    2),
-      ( 3,'Fatima Bello',       'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[2,4],    3),
-      ( 4,'Emeka Nwosu',        'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[0,3],    1),
-      ( 5,'Aisha Yusuf',        'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[1,2],    2),
-      ( 6,'Tunde Adeyemi',      'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[0,1,3],  3),
-      ( 7,'Ngozi Obi',          'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[2,4],    2),
-      ( 8,'Ibrahim Musa',       'Computer Science',         array['CSC 501','CSC 507','CSC 509'], array[0,2],    1),
-      ( 9,'Kemi Adebayo',       'Computer Science',         array['CSC 501','CSC 505','CSC 509'], array[1,3],    2),
-      (10,'Olumide Fashola',    'Computer Science',         array['CSC 501','CSC 507','CSC 509'], array[2,4],    3),
-      (11,'Zainab Lawal',       'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[0,3],    1),
-      (12,'Chidi Anyanwu',      'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[1,2],    2),
-      (13,'Blessing Etim',      'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[0,1,3],  3),
-      (14,'Suleiman Abubakar',  'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[2,4],    1),
-      (15,'Funmi Alade',        'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[0,2],    2),
-      (16,'Kelechi Udo',        'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[1,3],    3),
-      (17,'Halima Sani',        'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[2,4],    1),
-      (18,'Segun Balogun',      'Agricultural Engineering', array['AGE 501','AGE 507','AGE 509'], array[0,3],    2),
-      (19,'Amarachi Igwe',      'Agricultural Engineering', array['AGE 501','AGE 505','AGE 509'], array[1,2],    1),
-      (20,'Bola Ogunleye',      'Agricultural Engineering', array['AGE 501','AGE 507','AGE 509'], array[0,1,3],  3)
+      ( 1,'Adaeze Okafor',     'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[0,2],    1),
+      ( 2,'Chinedu Eze',       'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[1,3],    2),
+      ( 3,'Fatima Bello',      'Computer Science',         array['CSC 501','CSC 505','CSC 509'], array[2,4],    3),
+      ( 4,'Emeka Nwosu',       'Computer Science',         array['CSC 501','CSC 507','CSC 509'], array[0,3],    1),
+      ( 5,'Aisha Yusuf',       'Computer Science',         array['CSC 501','CSC 503','CSC 509'], array[1,2],    2),
+      ( 6,'Tunde Adeyemi',     'Computer Science',         array['CSC 501','CSC 505','CSC 507'], array[0,1,3],  3),
+      ( 7,'Ngozi Obi',         'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[0,2],    1),
+      ( 8,'Ibrahim Musa',      'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[1,3],    2),
+      ( 9,'Kemi Adebayo',      'Computer Science',         array['CSC 501','CSC 505','CSC 509'], array[2,4],    3),
+      (10,'Olumide Fashola',   'Computer Science',         array['CSC 501','CSC 507','CSC 509'], array[0,3],    1),
+      (11,'Uche Okonkwo',      'Computer Science',         array['CSC 501','CSC 503','CSC 509'], array[1,2],    2),
+      (12,'Yetunde Oyelaran',  'Computer Science',         array['CSC 501','CSC 505','CSC 507'], array[0,1,3],  3),
+      (13,'Musa Danjuma',      'Computer Science',         array['CSC 501','CSC 503','CSC 505'], array[0,2],    1),
+      (14,'Chiamaka Nnadi',    'Computer Science',         array['CSC 501','CSC 503','CSC 507'], array[1,3],    2),
+      (15,'Gbenga Ojo',        'Computer Science',         array['CSC 501','CSC 505','CSC 509'], array[2,4],    3),
+      (16,'Hauwa Garba',       'Computer Science',         array['CSC 501','CSC 507','CSC 509'], array[0,3],    1),
+      (17,'Ifeanyi Okeke',     'Computer Science',         array['CSC 501','CSC 503','CSC 509'], array[1,2],    2),
+      (18,'Ronke Akinola',     'Computer Science',         array['CSC 501','CSC 505','CSC 507'], array[0,1,3],  3),
+      (19,'Zainab Lawal',      'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[0,2],    1),
+      (20,'Chidi Anyanwu',     'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[1,3],    2),
+      (21,'Blessing Etim',     'Agricultural Engineering', array['AGE 501','AGE 505','AGE 509'], array[2,4],    3),
+      (22,'Suleiman Abubakar', 'Agricultural Engineering', array['AGE 501','AGE 507','AGE 509'], array[0,3],    1),
+      (23,'Funmi Alade',       'Agricultural Engineering', array['AGE 501','AGE 503','AGE 509'], array[1,2],    2),
+      (24,'Kelechi Udo',       'Agricultural Engineering', array['AGE 501','AGE 505','AGE 507'], array[0,1,3],  3),
+      (25,'Halima Sani',       'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[0,2],    1),
+      (26,'Segun Balogun',     'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[1,3],    2),
+      (27,'Amarachi Igwe',     'Agricultural Engineering', array['AGE 501','AGE 505','AGE 509'], array[2,4],    3),
+      (28,'Bola Ogunleye',     'Agricultural Engineering', array['AGE 501','AGE 507','AGE 509'], array[0,3],    1),
+      (29,'Bashir Aliyu',      'Agricultural Engineering', array['AGE 501','AGE 503','AGE 509'], array[1,2],    2),
+      (30,'Nkechi Umeh',       'Agricultural Engineering', array['AGE 501','AGE 505','AGE 507'], array[0,1,3],  3),
+      (31,'Femi Ogunbiyi',     'Agricultural Engineering', array['AGE 501','AGE 503','AGE 505'], array[0,2],    1),
+      (32,'Maryam Idris',      'Agricultural Engineering', array['AGE 501','AGE 503','AGE 507'], array[1,3],    2),
+      (33,'Obinna Chukwu',     'Agricultural Engineering', array['AGE 501','AGE 505','AGE 509'], array[2,4],    3),
+      (34,'Titi Ajayi',        'Agricultural Engineering', array['AGE 501','AGE 507','AGE 509'], array[0,3],    1),
+      (35,'Yusuf Ahmed',       'Agricultural Engineering', array['AGE 501','AGE 503','AGE 509'], array[1,2],    2),
+      (36,'Ebere Nwachukwu',   'Agricultural Engineering', array['AGE 501','AGE 505','AGE 507'], array[0,1,3],  3)
     ) as t(seq, full_name, department, courses, night_days, proficiency)
   loop
     v_email := lower(replace(s.full_name, ' ', '.')) || c_email_host;
@@ -216,7 +240,9 @@ begin
 
       v_enrolled := v_enrolled + 1;
 
-      if v_applied_at is not null then
+      if not c_apply then
+        null;  -- profiles and enrolments only
+      elsif v_applied_at is not null then
         -- already in the pool from an earlier run of this seed
         v_skipped := v_skipped + 1;
       elsif exists (
@@ -243,12 +269,12 @@ begin
   end loop;
 
   raise notice 'Seed complete: % profiles (% new), % enrollments, % new applications, % already in pool or placed.',
-    20, v_created, v_enrolled, v_applied, v_skipped;
+    36, v_created, v_enrolled, v_applied, v_skipped;
 end
 $seed$;
 
--- Visible summary — the seed ran clean only if every row shows
--- seeded_in_pool = seeded_enrolled.
+-- Visible summary. With c_apply false every row shows seeded_in_pool = 0;
+-- with it true, seeded_in_pool = seeded_enrolled.
 select c.course_code,
        count(*)                                          as seeded_enrolled,
        count(*) filter (where uc.applied_at is not null) as seeded_in_pool,
