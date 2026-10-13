@@ -20,20 +20,20 @@
 -- Courses
 -- ---------------------------------------------------------------------------
 insert into public.courses (course_code, course_title, department) values
-  ('CSC 201', 'Computer Programming I',        'Computer Science'),
-  ('CSC 203', 'Discrete Structures',           'Computer Science'),
-  ('CSC 301', 'Data Structures and Algorithms','Computer Science'),
-  ('MTH 201', 'Mathematical Methods I',        'Mathematics'),
-  ('MTH 241', 'Linear Algebra',                'Mathematics'),
-  ('ECO 201', 'Microeconomic Theory I',        'Economics'),
-  ('ECO 203', 'Macroeconomic Theory I',        'Economics'),
-  ('PHY 201', 'Classical Mechanics',           'Physics'),
-  ('CHM 201', 'Physical Chemistry I',          'Chemistry'),
-  ('BIO 201', 'General Physiology',            'Biology')
+  ('CSC 501', 'Compiler Construction',                          'Computer Science'),
+  ('CSC 503', 'Artificial Intelligence',                        'Computer Science'),
+  ('CSC 505', 'Computer Networks and Communications',           'Computer Science'),
+  ('CSC 507', 'Advanced Database Systems',                      'Computer Science'),
+  ('CSC 509', 'Computer Security',                              'Computer Science'),
+  ('AGE 501', 'Farm Power and Machinery',                       'Agricultural Engineering'),
+  ('AGE 503', 'Soil and Water Conservation Engineering',        'Agricultural Engineering'),
+  ('AGE 505', 'Irrigation and Drainage Engineering',            'Agricultural Engineering'),
+  ('AGE 507', 'Processing and Storage of Agricultural Products','Agricultural Engineering'),
+  ('AGE 509', 'Agricultural Structures and Environment Control','Agricultural Engineering')
 on conflict (course_code) do nothing;
 
 -- ---------------------------------------------------------------------------
--- Sanity check — expect 10 courses.
+-- Sanity check — expect 10 courses (500 level, see migration 0026).
 -- ---------------------------------------------------------------------------
 -- select course_code, course_title, department
 -- from public.courses
