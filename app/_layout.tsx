@@ -1,13 +1,13 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import {
-  useFonts,
-  Baloo2_400Regular,
-  Baloo2_500Medium,
-  Baloo2_600SemiBold,
-  Baloo2_700Bold,
-  Baloo2_800ExtraBold,
-} from '@expo-google-fonts/baloo-2';
+import { useFonts } from 'expo-font';
+// One import per weight rather than the package index: the index pulls in all
+// eighteen files of each family (about 6 MB apiece) and the app uses five.
+import { Montserrat_400Regular } from '@expo-google-fonts/montserrat/400Regular';
+import { Montserrat_500Medium } from '@expo-google-fonts/montserrat/500Medium';
+import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat/600SemiBold';
+import { LeagueSpartan_700Bold } from '@expo-google-fonts/league-spartan/700Bold';
+import { LeagueSpartan_800ExtraBold } from '@expo-google-fonts/league-spartan/800ExtraBold';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,7 +16,8 @@ import { NetworkProvider } from '@/context/NetworkContext';
 import { colors } from '@/theme';
 
 /**
- * Root layout: Baloo 2, providers, then the auth-aware router gate.
+ * Root layout: fonts (Montserrat for text, League Spartan for headings),
+ * providers, then the auth-aware router gate.
  */
 
 function RouteGuard({
@@ -62,7 +63,7 @@ function RouteGuard({
   }, [initialising, session, profile, segments, router]);
 
   // Fonts must be ready before any screen renders, or the first paint is in
-  // the wrong typeface and reflows once Baloo 2 lands.
+  // the wrong typeface and reflows once the fonts land.
   if (initialising || !fontsLoaded) {
     return (
       <View style={styles.splash}>
@@ -76,11 +77,12 @@ function RouteGuard({
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    Baloo2_400Regular,
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
-    Baloo2_700Bold,
-    Baloo2_800ExtraBold,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    // The heading face (FONT.bold and FONT.extra in src/theme.ts).
+    LeagueSpartan_700Bold,
+    LeagueSpartan_800ExtraBold,
   });
 
   return (

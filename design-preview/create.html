@@ -3,61 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create a group · StudySync preview</title>
+<title>New group · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .toggle { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
-  .toggle .rl-main b { font-size: 15px; font-weight: 700; display: block; }
-  .toggle .rl-main span { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .course { display: flex; align-items: center; gap: 12px; }
+  .course.on { box-shadow: 0 0 0 2px var(--ink); }
+  .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); flex-shrink: 0; }
+  .radio.on { border: 7px solid var(--ink); }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <div class="pagehead">
-          <a class="circle-btn" href="groups.html" aria-label="Back">
-            <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          </a>
-          <h1>Create a group</h1>
-        </div>
-
-        <div class="fieldwrap" style="margin-top:20px">
-          <label class="flabel">Group name</label>
-          <div class="field">e.g. MTH 111 Squad</div>
-        </div>
-
-        <div class="section-h" style="margin-top:20px">
-          <h3>Course</h3>
-        </div>
-        <div class="chiprow">
-          <span class="chip selected">MTH 111</span>
-          <span class="chip">PHY 101</span>
-          <span class="chip">CSC 121</span>
-        </div>
-
-        <div class="toggle">
-          <div class="rl-main">
-            <b>Anyone can join</b>
-            <span>Off means you approve each request</span>
-          </div>
-          <span class="switch off"><i></i></span>
-        </div>
-
-        <div style="margin-top:26px">
-          <button class="btn block">Create group</button>
-        </div>
-        <div class="notecard" style="margin-top:14px">Works offline. It sends as soon as you are back online.</div>
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="groups.html" aria-label="Close"><i data-icon="x"></i></a>
+        <div class="t"><b>New group</b><span>Takes a minute</span></div>
+        <span></span>
       </div>
+
+      <div class="sheet plain" style="padding-bottom:110px">
+        <div class="fieldwrap" style="margin-top:4px">
+          <label class="flabel">Group name</label>
+          <div class="field focus">MTH 111 Squad</div>
+          <p class="hint">Members see this in their group list.</p>
+        </div>
+
+        <div class="h-section"><h3>Course</h3></div>
+        <div class="stack">
+          <div class="item course on"><span class="tile sm c1">MTH</span><div class="item-main"><div class="item-title">MTH 111</div><div class="item-sub">Elementary Mathematics I</div></div><span class="radio on"></span></div>
+          <div class="item course"><span class="tile sm c2">PHY</span><div class="item-main"><div class="item-title">PHY 101</div><div class="item-sub">General Physics I</div></div><span class="radio"></span></div>
+          <div class="item course"><span class="tile sm c3">CSC</span><div class="item-main"><div class="item-title">CSC 121</div><div class="item-sub">Introduction to Programming</div></div><span class="radio"></span></div>
+        </div>
+
+        <div class="h-section"><h3>Who can join</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>Anyone can join</b><span>Off means you approve each request</span></div><span class="switch off"><i></i></span></div>
+        </div>
+
+        <div class="note" style="margin-top:16px"><i data-icon="info" class="sm"></i><span>Works offline. The group is created as soon as you're back online.</span></div>
+      </div>
+
+      <div class="dock"><button class="btn">Create group</button></div>
     </div>
   </div>
-  <p class="caption">Create a group.</p>
+  <p class="caption">New group. Big soft fields, the chosen course outlined in ink, Create floating at the bottom.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

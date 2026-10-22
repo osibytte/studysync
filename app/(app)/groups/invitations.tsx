@@ -10,7 +10,7 @@ import { useInvitations } from '@/hooks/useInvitations';
 import { capacityLabel, displayName, isFull, isLive } from '@/lib/groupRules';
 import { respondInvitation } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { FONT, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing, shadowCard } from '@/theme';
 import type { InvitationDetailRow } from '@/types/database';
 
 /**
@@ -62,7 +62,7 @@ export default function InvitationsScreen() {
     <Screen
       title="Invitations"
       subtitle="Groups that have asked you to join them."
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {!isOnline && (
         <Text style={styles.note}>
@@ -166,9 +166,9 @@ const styles = StyleSheet.create({
   card: {
     marginTop: spacing.md,
     padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {

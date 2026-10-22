@@ -3,183 +3,111 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Group chat · StudySync preview</title>
+<title>Chat · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .chat-head {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px 12px;
-    border-bottom: 1px solid var(--border);
-    background: #FFFEFB;
-  }
-  .circle-btn {
-    width: 42px; height: 42px; border-radius: 50%;
-    background: #fff; border: 1px solid var(--border-strong);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px; font-weight: 800; color: var(--ink);
-    text-decoration: none; flex-shrink: 0;
-  }
-  .chat-head .mid { flex: 1; min-width: 0; }
-  .chat-head .mid b { display: block; font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chat-head .mid span { font-size: 12px; font-weight: 700; color: var(--muted); }
-  .files-link {
-    text-decoration: none; color: var(--primary); font-weight: 800; font-size: 13px;
-    border: 1.5px solid var(--border-strong); border-radius: 999px; padding: 9px 14px;
-    background: #fff; flex-shrink: 0;
-  }
+  .chead { display: flex; align-items: center; gap: 10px; padding: 8px 16px 12px; }
+  .chead .who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .chead .who b { display: block; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chead .who span { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+  .chead .who span i { width: 7px; height: 7px; border-radius: 50%; background: var(--green-600); display: inline-block; }
 
-  .chat-body { flex: 1; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 6px; }
-
-  .day {
-    align-self: center; background: var(--surface-alt); border-radius: 999px;
-    padding: 5px 14px; font-size: 11px; font-weight: 800; color: var(--muted);
-    letter-spacing: 0.6px; text-transform: uppercase; margin: 6px 0;
-  }
-
-  .msg { max-width: 80%; display: flex; flex-direction: column; }
+  .body { flex: 1; background: var(--surface); border-radius: 28px 28px 0 0; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .day { align-self: center; font-size: 12px; font-weight: 600; color: var(--text-3); background: var(--surface-2); border-radius: 999px; padding: 5px 12px; margin: 4px 0 8px; }
+  .msg { display: flex; gap: 8px; max-width: 84%; margin-top: 10px; }
   .msg.them { align-self: flex-start; }
-  .msg.me { align-self: flex-end; }
-  .msg .name { font-size: 12px; font-weight: 800; color: var(--primary); margin: 4px 0 3px 4px; }
-  .bubble {
-    background: #fff; border: 1px solid var(--border);
-    padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 6px;
-    box-shadow: var(--shadow-card);
-    font-size: 15px; font-weight: 600; line-height: 1.45;
-  }
-  /* slightly deeper periwinkle than --primary so white body text stays
-     readable in daylight (the hero-card tint is for display text only) */
-  .msg.me .bubble {
-    background: #6E6AE6; color: #fff; border: none;
-    border-radius: 18px; border-bottom-right-radius: 6px;
-    box-shadow: none;
-  }
-  .msg.pending { opacity: 0.6; }
-  .msg .state { font-size: 11px; font-weight: 700; color: var(--muted); margin: 3px 6px 0 0; text-align: right; }
+  .msg.me { align-self: flex-end; flex-direction: column; align-items: flex-end; }
+  .msg .avatar { align-self: flex-end; }
+  .msg .name { font-size: 12px; font-weight: 700; color: var(--text-2); margin: 0 0 4px 14px; }
+  .msg .name time { font-weight: 500; color: var(--text-3); margin-left: 4px; }
+  .bubble { background: var(--surface-2); padding: 11px 15px; border-radius: 20px 20px 20px 6px; font-size: 15px; line-height: 1.45; }
+  .msg.me .bubble { background: var(--ink); color: #fff; border-radius: 20px 20px 6px 20px; }
+  .msg .state { font-size: 11px; color: var(--text-3); margin: 4px 4px 0 0; display: flex; align-items: center; gap: 4px; }
+  .msg.pending .bubble { opacity: .55; }
 
-  .session {
-    align-self: flex-start; width: 88%;
-    margin-top: 6px;
-    border-top: 3px solid var(--accent);
-  }
-  .session .head { display: flex; justify-content: space-between; align-items: center; }
-  .session .head b { font-size: 12px; font-weight: 800; color: var(--accent-deep); text-transform: uppercase; letter-spacing: 0.4px; }
-  .session .time { font-size: 18px; font-weight: 800; margin-top: 7px; }
-  .session .sub { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-  .avatars { display: flex; margin-top: 12px; }
-  .avatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--primary-soft); color: var(--primary);
-    font-size: 11px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center;
-    border: 2px solid #fff; margin-left: -6px;
-  }
-  .avatar:first-child { margin-left: 0; }
-  .avatar.plus { background: var(--surface-alt); color: var(--muted); }
-  .session .actions { display: flex; gap: 10px; margin-top: 14px; }
-  .session .actions .btn { flex: 1; }
-  .btn.small.danger-ghost { background: transparent; color: var(--danger); box-shadow: none; border: 1.5px solid var(--danger-soft); }
+  .session { margin: 12px 0 2px; border-radius: 24px; padding: 16px; background: var(--green-800); color: #fff; }
+  .session .top { display: flex; align-items: center; justify-content: space-between; }
+  .session .kind { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.75); }
+  .session .time { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-top: 10px; }
+  .session .sub { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; }
+  .session .people { display: flex; align-items: center; margin-top: 14px; }
+  .session .people .avatar { border: 2px solid var(--green-800); margin-left: -7px; }
+  .session .people .avatar:first-child { margin-left: 0; }
+  .session .people small { font-size: 12px; color: rgba(255,255,255,.75); margin-left: 8px; }
+  .session .acts { display: flex; gap: 8px; margin-top: 16px; }
+  .session .acts .btn { flex: 1; }
+  .session .btn.glass { background: rgba(255,255,255,.12); border-color: transparent; color: #fff; }
 
-  .filerow { align-self: stretch; display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-  .filerow .save { color: var(--primary); font-weight: 800; font-size: 13px; text-decoration: none; flex-shrink: 0; }
+  .file { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; background: var(--surface-2); border-radius: 20px 20px 20px 6px; width: 250px; }
+  .file b { font-size: 14px; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file span { font-size: 12px; color: var(--text-3); }
 
-  .composer {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px 26px;
-    background: #FFFEFB; border-top: 1px solid var(--border);
-  }
-  .composer .field {
-    flex: 1; background: var(--surface-alt); border: 1px solid var(--border);
-    border-radius: 999px; padding: 12px 16px;
-    font-size: 14px; font-weight: 600; color: var(--muted);
-  }
-  .send {
-    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-    background: var(--accent); color: var(--ink); border: none;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
+  .composer { display: flex; align-items: center; gap: 8px; padding: 10px 12px 28px; background: var(--surface); border-top: 1px solid var(--line); }
+  .composer .field { flex: 1; height: 48px; border-radius: 999px; background: var(--surface-2); border-color: var(--surface-2); box-shadow: none; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="chat-head">
-        <a class="circle-btn" href="groups.html" aria-label="Back">
-          <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      <div class="statusbar"></div>
+      <div class="chead">
+        <a class="round" href="group.html" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <a class="who" href="group.html">
+          <span class="tile sm c1">MTH</span>
+          <div style="min-width:0"><b>MTH 111 Squad</b><span><i></i>5 members</span></div>
         </a>
-        <div class="mid">
-          <b>MTH 111 Squad</b>
-          <span>Active · 5 members</span>
-        </div>
-        <a class="files-link" href="#">Files</a>
+        <a class="round" href="#" aria-label="Files"><i data-icon="folder"></i></a>
       </div>
 
-      <div class="chat-body">
+      <div class="body">
         <span class="day">Today</span>
 
         <div class="msg them">
-          <span class="name">Ngozi</span>
-          <div class="bubble">Has anyone started the week 5 problems?</div>
+          <span class="avatar xs c1">NO</span>
+          <div><div class="name">Ngozi <time>10:12</time></div><div class="bubble">Has anyone started the week 5 problems?</div></div>
+        </div>
+        <div class="msg me"><div class="bubble">I did the first three. Want to compare answers before Friday?</div></div>
+        <div class="msg them">
+          <span class="avatar xs c3">TE</span>
+          <div><div class="name">Tunde <time>10:20</time></div><div class="bubble">I'm in. Library at 4?</div></div>
         </div>
 
-        <div class="msg me">
-          <div class="bubble">I did the first three. Want to compare answers before Friday?</div>
+        <div class="session">
+          <div class="top"><span class="kind"><i data-icon="calendar" class="sm"></i>Study time</span><span class="badge waiting">Needs 1 more yes</span></div>
+          <div class="time">Thursday, 4:00 PM</div>
+          <div class="sub">90 min · proposed by Ngozi</div>
+          <div class="people">
+            <span class="avatar sm c2">AD</span><span class="avatar sm c1">NO</span><span class="avatar sm c3">TE</span>
+            <small>2 of 5 said yes</small>
+          </div>
+          <div class="acts"><button class="btn small glass">Can't make it</button><button class="btn small white">I'm in</button></div>
         </div>
 
         <div class="msg them">
-          <span class="name">Tunde</span>
-          <div class="bubble">I'm in. Library at 4?</div>
-        </div>
-
-        <div class="card session">
-          <div class="head"><b>Study session</b><span class="pill forming">Waiting for replies</span></div>
-          <div class="time">Thursday · 4:00 PM</div>
-          <div class="sub">90 min · proposed by Ngozi</div>
-          <div class="avatars">
-            <span class="avatar">AD</span>
-            <span class="avatar">NG</span>
-            <span class="avatar">TD</span>
-            <span class="avatar plus">+2</span>
+          <span class="avatar xs c1">NO</span>
+          <div><div class="name">Ngozi <time>10:31</time></div>
+            <div class="file">
+              <span class="tile sm c4"><i data-icon="file" class="sm"></i></span>
+              <div style="flex:1; min-width:0"><b>Week 5 Notes.pdf</b><span>PDF · 2.1 MB</span></div>
+              <a class="round sm" href="#" aria-label="Save"><i data-icon="download" class="sm"></i></a>
+            </div>
           </div>
-          <div class="actions">
-            <button class="btn small danger-ghost">Can't make it</button>
-            <button class="btn small">I'm in</button>
-          </div>
-        </div>
-
-        <div class="card filerow">
-          <div class="tile mango">PDF</div>
-          <div class="row-main">
-            <div class="row-title" style="font-size:14.5px">Week 5 Notes.pdf</div>
-            <div class="row-sub" style="margin-top:2px">Ngozi · 2.1 MB · Today</div>
-          </div>
-          <a class="save" href="#">Save</a>
         </div>
 
         <div class="msg me pending">
           <div class="bubble">Bringing the past questions too.</div>
-          <span class="state">Sending…</span>
+          <span class="state"><i data-icon="clock" class="xs"></i>Sends when you're back online</span>
         </div>
       </div>
 
       <div class="composer">
-        <a class="circle-btn" href="#" aria-label="Attach or propose">
-          <svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        </a>
-        <div class="field">Message</div>
-        <button class="send" aria-label="Send">
-          <svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-        </button>
+        <a class="round" href="#" aria-label="Attach a file or propose a time" style="background:var(--surface-2); box-shadow:none"><i data-icon="plus"></i></a>
+        <div class="field ph">Message</div>
+        <button class="round dark" aria-label="Send"><i data-icon="send" class="sm"></i></button>
       </div>
     </div>
   </div>
-  <p class="caption">Group chat. The faded bubble is a message waiting to send while offline.</p>
+  <p class="caption">Group chat. Your messages in ink, a proposed study time as a green card, a faded bubble waiting to send offline.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

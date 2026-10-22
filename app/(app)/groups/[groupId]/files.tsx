@@ -149,7 +149,7 @@ export default function GroupFilesScreen() {
           ? `Everything shared in ${group.group_name}.`
           : 'Everything this group has shared.'
       }
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {!isOnline && (
         <Text style={styles.note}>

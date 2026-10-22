@@ -4,14 +4,14 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '@/components/Button';
-import { OfflineBanner } from '@/components/OfflineBanner';
+import { Feather } from '@expo/vector-icons';
+import { BandScreen } from '@/components/BandScreen';
+import { Initials, courseTag } from '@/components/Initials';
+import { RoundButton } from '@/components/RoundButton';
 import { StatusPill } from '@/components/StatusPill';
 import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
@@ -20,16 +20,17 @@ import { useMyGroups } from '@/hooks/useMyGroups';
 import { useUnread } from '@/hooks/useUnread';
 import { lastMessageLine, unreadBadge } from '@/lib/chatRules';
 import { capacityLabel, isCreator } from '@/lib/groupRules';
-import { FONT, colors, fontSize, radius, spacing, typography } from '@/theme';
+import { FONT, colors, fontSize, radius, shadowCard, spacing, typography } from '@/theme';
 import type { MyGroupRow, UnreadCountRow } from '@/types/database';
 
 /**
  * "Your groups" — the hub for Stage 2.
  *
  * Leads with the groups the student is already in, because that is what they
- * open the app for once they have any. The three ways to get more (matching,
- * browsing, creating) sit below, and pending invitations are pulled up top as a
- * banner: an unanswered invite is time-sensitive in a way a browse list is not.
+ * open the app for once they have any. The four ways to get more (applying,
+ * suggestions, browsing, creating) sit on the green band above, and pending
+ * invitations come first in the list: an unanswered invite is time-sensitive in
+ * a way a browse list is not.
  */
 export default function GroupsScreen() {
   const { profile } = useAuth();
@@ -68,100 +69,131 @@ export default function GroupsScreen() {
     }, [reload, reloadInvites])
   );
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <OfflineBanner />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={syncing}
-            onRefresh={() => void onRefresh()}
-            tintColor={colors.primaryDark}
-          />
-        }
-      >
-        <Text style={typography.title} accessibilityRole="header">
-          Your groups
-        </Text>
+  const ways: {
+    icon: React.ComponentProps<typeof Feather>['name'];
+    label: string;
+    hint: string;
+    href: '/(app)/groups/matching' | '/(app)/groups/match' | '/(app)/groups/discover' | '/(app)/groups/create';
+  }[] = [
+    {
+      icon: 'zap',
+      label: 'Apply to be matched',
+      hint: 'Asks the system to place you in a group on a course, during the registration period',
+      href: '/(app)/groups/matching',
+    },
+    {
+      icon: 'star',
+      label: 'Suggestions',
+      hint: 'Ranks groups and study partners by how well your schedules line up',
+      href: '/(app)/groups/match',
+    },
+    { icon: 'search', label: 'Browse open groups', hint: 'Open groups on your courses', href: '/(app)/groups/discover' },
+    { icon: 'plus', label: 'Create a group', hint: 'Start your own', href: '/(app)/groups/create' },
+  ];
 
-        {invitations.length > 0 && (
+  return (
+    <BandScreen
+      title="Groups"
+      subtitle={
+        groups.length > 0
+          ? `${groups.length} group${groups.length === 1 ? '' : 's'}`
+          : 'Find people to study with'
+      }
+      refreshControl={
+        <RefreshControl
+          refreshing={syncing}
+          onRefresh={() => void onRefresh()}
+          tintColor={colors.onBand}
+          colors={[colors.primary]}
+        />
+      }
+      right={
+        <RoundButton
+          icon="plus"
+          label="Create a group"
+          tone="glass"
+          onPress={() => router.push('/(app)/groups/create')}
+        />
+      }
+      bandContent={
+        <View style={styles.ways}>
+          {ways.map((w) => (
+            <Pressable
+              key={w.href}
+              onPress={() => router.push(w.href)}
+              accessibilityRole="button"
+              accessibilityLabel={w.label}
+              accessibilityHint={w.hint}
+              style={({ pressed }) => [styles.way, pressed && styles.wayPressed]}
+            >
+              <Feather name={w.icon} size={20} color={colors.bandHighlight} />
+              <Text style={styles.wayLabel} numberOfLines={2}>
+                {w.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      }
+    >
+      {invitations.length > 0 && (
+        <>
+          <Text style={[styles.sectionHeader, styles.firstHeader]} accessibilityRole="header">
+            Invitations
+          </Text>
           <Pressable
             onPress={() => router.push('/(app)/groups/invitations')}
-            style={styles.inviteBanner}
+            style={({ pressed }) => [styles.card, styles.inviteCard, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel={`${invitations.length} pending invitation${
               invitations.length === 1 ? '' : 's'
             }. Open your invitations.`}
           >
-            <Text style={styles.inviteBannerText}>
-              {invitations.length} pending invitation
-              {invitations.length === 1 ? '' : 's'}
-            </Text>
-            <Text style={styles.inviteBannerLink}>View</Text>
+            <View style={styles.inviteIcon}>
+              <Feather name="mail" size={20} color={colors.warning} />
+            </View>
+            <View style={styles.cardMain}>
+              <Text style={styles.cardName}>
+                {invitations.length} pending invitation{invitations.length === 1 ? '' : 's'}
+              </Text>
+              <Text style={styles.cardMeta}>Accept or decline</Text>
+            </View>
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingText}>Pending</Text>
+            </View>
           </Pressable>
-        )}
+        </>
+      )}
 
-        {loading && groups.length === 0 ? (
-          <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
-        ) : error && groups.length === 0 ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : groups.length === 0 ? (
+      <Text
+        style={[styles.sectionHeader, invitations.length === 0 && styles.firstHeader]}
+        accessibilityRole="header"
+      >
+        Your groups
+      </Text>
+
+      {loading && groups.length === 0 ? (
+        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
+      ) : error && groups.length === 0 ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : groups.length === 0 ? (
+        <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>
             You are not in a group yet. Let matching suggest one, browse what is
-            open on your courses, or start your own.
+            open on your courses, or start your own. The four ways are just above.
           </Text>
-        ) : (
-          groups.map((group) => (
-            <GroupRow
-              key={group.group_id}
-              group={group}
-              unread={byGroup[group.group_id]}
-              currentUserId={userId}
-              onPress={() => router.push(`/(app)/groups/${group.group_id}`)}
-            />
-          ))
-        )}
-
-        <Text style={styles.sectionHeader}>Find more</Text>
-        <Button
-          label="Apply to be matched"
-          onPress={() => router.push('/(app)/groups/matching')}
-          accessibilityHint="Asks the system to place you in a group on a course, during the registration period"
-        />
-        <Button
-          label="Suggest groups for me"
-          variant="secondary"
-          onPress={() => router.push('/(app)/groups/match')}
-          style={styles.spaced}
-          accessibilityHint="Ranks groups and study partners by how well your schedules line up"
-        />
-        <Button
-          label="Browse open groups"
-          variant="secondary"
-          onPress={() => router.push('/(app)/groups/discover')}
-          style={styles.spaced}
-        />
-        <Button
-          label="Create a group"
-          variant="secondary"
-          onPress={() => router.push('/(app)/groups/create')}
-          style={styles.spaced}
-        />
-        <Button
-          label="Invitations"
-          variant="ghost"
-          onPress={() => router.push('/(app)/groups/invitations')}
-          style={styles.spaced}
-        />
-        <Button
-          label="Back to home"
-          variant="ghost"
-          onPress={() => router.push('/(app)/home')}
-          style={styles.spaced}
-        />
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      ) : (
+        groups.map((group) => (
+          <GroupRow
+            key={group.group_id}
+            group={group}
+            unread={byGroup[group.group_id]}
+            currentUserId={userId}
+            onPress={() => router.push(`/(app)/groups/${group.group_id}`)}
+          />
+        ))
+      )}
+    </BandScreen>
   );
 }
 
@@ -197,7 +229,7 @@ function GroupRow({
   return (
     <Pressable
       onPress={onPress}
-      style={styles.card}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityLabel={[
         group.group_name,
@@ -210,100 +242,113 @@ function GroupRow({
         .filter(Boolean)
         .join(', ')}
     >
-      <View style={styles.cardTop}>
+      <Initials text={courseTag(group.course?.course_code)} colorKey={group.group_id} />
+      <View style={styles.cardMain}>
         <Text style={styles.cardName} numberOfLines={1}>
           {group.group_name}
         </Text>
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          {group.course?.course_code ?? '—'} · {capacityLabel(group.member_count, group.max_members)}
+          {isCreator(group.role) ? ' · yours' : ''}
+        </Text>
+        {preview !== '' && (
+          <Text
+            style={[styles.cardPreview, badge !== null && styles.cardPreviewUnread]}
+            numberOfLines={1}
+          >
+            {preview}
+          </Text>
+        )}
+      </View>
+      <View style={styles.cardRight}>
+        <StatusPill status={group.status} />
         {badge !== null && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         )}
-        <StatusPill status={group.status} />
       </View>
-      <Text style={styles.cardCourse}>
-        {group.course?.course_code ?? '—'}
-        {group.course?.course_title ? ` · ${group.course.course_title}` : ''}
-      </Text>
-      <Text style={styles.cardMeta}>
-        {capacityLabel(group.member_count, group.max_members)}
-        {isCreator(group.role) ? ' · you created this' : ''}
-      </Text>
-      {preview !== '' && (
-        <Text
-          style={[styles.cardPreview, badge !== null && styles.cardPreviewUnread]}
-          numberOfLines={1}
-        >
-          {preview}
-        </Text>
-      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  loader: { marginVertical: spacing.xl },
-  errorText: { fontSize: fontSize.sm, color: colors.danger, marginTop: spacing.lg },
-  emptyText: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    lineHeight: 20,
-    marginTop: spacing.lg,
+  ways: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xl - 4 },
+  way: {
+    width: '48.5%',
+    flexGrow: 1,
+    minHeight: 84,
+    padding: spacing.md + 2,
+    gap: spacing.sm + 2,
+    borderRadius: radius.lg - 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  inviteBanner: {
+  wayPressed: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  wayLabel: { fontSize: fontSize.sm - 1, fontFamily: FONT.semi, color: colors.onBand, lineHeight: 18 },
+
+  pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  loader: { marginVertical: spacing.xl },
+  errorText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.danger },
+  emptyCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg + 2, ...shadowCard },
+  emptyText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textSecondary, lineHeight: 21 },
+
+  sectionHeader: { ...typography.section, marginTop: spacing.xl + 2, marginBottom: spacing.md, paddingHorizontal: 2 },
+  firstHeader: { marginTop: 0 },
+
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: colors.flameSoft,
-    borderWidth: 1.5,
-    borderColor: colors.flame,
-  },
-  inviteBannerText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
-  inviteBannerLink: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.flame },
-  card: {
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    gap: spacing.md,
+    minHeight: 80,
+    padding: spacing.md + 2,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    marginBottom: spacing.sm + 2,
+    ...shadowCard,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardName: {
-    flex: 1,
-    fontSize: fontSize.md,
-    fontFamily: FONT.bold,
-    color: colors.text,
-    paddingRight: spacing.sm,
+  inviteCard: { minHeight: 76 },
+  inviteIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FDE8D7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardCourse: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.primaryDark, marginTop: spacing.xs },
-  cardMeta: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 2 },
+  pendingBadge: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.info,
+  },
+  pendingText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.textInverse },
+  cardMain: { flex: 1, minWidth: 0 },
+  cardRight: { alignItems: 'flex-end', gap: spacing.sm },
+  cardName: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
+  cardMeta: { fontSize: fontSize.sm - 1, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 3 },
   cardPreview: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.sm - 1,
     fontFamily: FONT.regular,
     color: colors.textMuted,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   /** Unread reads as darker and heavier, so the badge is not the only signal. */
   cardPreviewUnread: { color: colors.text, fontFamily: FONT.semi },
   /**
-   * Shaped like `StatusPill` on purpose — same padding, radius and text size —
-   * but the only filled chip on the card, which is what makes it the thing your
-   * eye lands on. `minWidth` keeps a single digit from squashing into a stripe.
-   * Orange-red, same as the tab and home badges: unread is always this colour.
+   * Ink, round, white digits: the same count chip everywhere a group shows
+   * unread messages. `minWidth` keeps a single digit from squashing into a
+   * stripe. (Red stays for the Inbox count only.)
    */
   badge: {
     minWidth: 24,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    marginRight: spacing.xs,
+    height: 24,
+    paddingHorizontal: 7,
     borderRadius: radius.pill,
-    backgroundColor: colors.flame,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeText: {
     fontSize: fontSize.xs,
@@ -311,12 +356,4 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
     textAlign: 'center',
   },
-  sectionHeader: {
-    fontSize: fontSize.md,
-    fontFamily: FONT.bold,
-    color: colors.text,
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  spaced: { marginTop: spacing.sm },
 });

@@ -6,52 +6,43 @@
 <title>Sign in · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .auth {
-    flex: 1;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-  .auth .logo-tile { width: 62px; height: 62px; border-radius: 20px; }
-  .auth h1 { font-size: 27px; font-weight: 700; margin-top: 22px; }
-  .auth .lead { color: var(--muted); font-size: 15px; font-weight: 500; margin-top: 4px; }
-  .auth .btn { margin-top: 26px; }
-  .auth .alt { text-align: center; margin-top: 14px; }
-  .auth .alt a { color: var(--primary-dark); font-weight: 700; font-size: 14px; text-decoration: none; }
+  .band { padding-bottom: 56px; }
+  .hero { padding: 36px 24px 0; }
+  .hero .mark { width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; }
+  .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; margin-top: 22px; }
+  .hero p { font-size: 15px; color: rgba(255,255,255,0.78); margin-top: 8px; line-height: 1.5; }
+  .sheet { padding: 12px 20px 40px; }
+  .alt { text-align: center; margin-top: 18px; font-size: 14px; color: var(--text-2); }
+  .alt a { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="auth">
-        <div class="logo-tile">
-          <svg class="ic" style="width:30px; height:30px" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="hero">
+          <span class="mark"><i data-icon="logo" class="lg"></i></span>
+          <h1>Welcome back to StudySync</h1>
+          <p>Sign in with your school email to see your groups.</p>
         </div>
-        <h1>Sign in</h1>
-        <p class="lead">Use your school email.</p>
-
+      </div>
+      <div class="sheet">
         <div class="fieldwrap">
           <label class="flabel">Email</label>
-          <div class="field">ada.dimoko@ui.edu.ng</div>
+          <div class="field "><i data-icon="mail" class="sm"></i>ada.dimoko@ui.edu.ng</div>
         </div>
         <div class="fieldwrap">
           <label class="flabel">Password</label>
-          <div class="field">••••••••••</div>
+          <div class="field focus"><i data-icon="shield" class="sm"></i>••••••••••</div>
         </div>
 
-        <button class="btn block">Sign in</button>
+        <button class="btn block" style="margin-top:24px">Sign in<i data-icon="arrow" class="sm"></i></button>
         <p class="alt">New here? <a href="signup.html">Create an account</a></p>
       </div>
     </div>
   </div>
-  <p class="caption">Sign in.</p>
+  <p class="caption">Sign in. Brand band in green, the form on the sheet below it.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

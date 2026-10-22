@@ -138,7 +138,7 @@ export default function NotificationSettingsScreen() {
     <Screen
       title="Notifications"
       subtitle="What StudySync tells you, and when it keeps quiet."
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {!isOnline && (
         <Text style={styles.note}>

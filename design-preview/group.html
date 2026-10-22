@@ -3,104 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Group detail · StudySync preview</title>
+<title>Group · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .member { display: flex; align-items: center; gap: 12px; }
-  .roletag {
-    background: var(--surface-alt); color: var(--muted);
-    border-radius: 999px; padding: 3px 10px;
-    font-size: 11.5px; font-weight: 700;
-  }
-  .request { background: var(--flame-soft); border: 1.5px solid var(--flame); border-radius: 22px; padding: 14px 16px; }
-  .request .what { font-size: 15px; font-weight: 600; }
-  .request .what b { font-weight: 700; }
-  .request .actions { display: flex; gap: 10px; margin-top: 12px; }
-  .request .actions .btn { flex: 1; }
-  .actions-row { display: flex; gap: 10px; margin-top: 10px; }
-  .actions-row .btn { flex: 1; }
+  .band { padding-bottom: 64px; }
+  .gid { display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: -66px; position: relative; z-index: 1; }
+  .gid .tile { width: 84px; height: 84px; border-radius: 26px; font-size: 20px; border: 4px solid #fff; box-shadow: var(--shadow-card); }
+  .gid h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; margin-top: 12px; }
+  .gid .meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--text-3); }
+  .sheet { padding-top: 0; padding-bottom: 110px; }
+  .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; }
+  .quick a { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-card); font-size: 13px; font-weight: 600; }
+  .slot { display: flex; align-items: center; gap: 12px; }
+  .slot .day { width: 52px; height: 56px; border-radius: 14px; background: var(--green-tint); border: 1px solid var(--green-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+  .slot .day small { font-size: 11px; font-weight: 600; color: var(--green-700); text-transform: uppercase; letter-spacing: .04em; }
+  .slot .day b { font-size: 15px; font-weight: 800; color: var(--green-800); }
+  .req .acts { display: flex; gap: 8px; margin-top: 12px; }
+  .req .acts .btn { flex: 1; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <div class="pagehead">
-          <a class="circle-btn" href="groups.html" aria-label="Back">
-            <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          </a>
-          <h1>MTH 111 Squad</h1>
-          <span class="pill active">Active</span>
-        </div>
-
-        <div class="card hero" style="margin-top:16px">
-          <div>
-            <b>Thursday 4:00 PM</b>
-            <p>Free for all 5 members</p>
-            <div class="daydots">
-              <i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-h">
-          <h3>Members</h3>
-          <a href="#">Invite</a>
-        </div>
-        <div class="card member">
-          <span class="avatar">AD</span>
-          <div class="row-main">
-            <div class="row-title" style="font-size:15px">Ada Dimoko</div>
-            <div class="row-sub">You</div>
-          </div>
-          <span class="roletag">Admin</span>
-        </div>
-        <div class="card member">
-          <span class="avatar" style="background:var(--accent-soft); color:var(--accent-deep)">NO</span>
-          <div class="row-main">
-            <div class="row-title" style="font-size:15px">Ngozi O.</div>
-            <div class="row-sub">4 shared slots</div>
-          </div>
-        </div>
-        <div class="card member">
-          <span class="avatar" style="background:var(--flame-soft); color:var(--flame)">TE</span>
-          <div class="row-main">
-            <div class="row-title" style="font-size:15px">Tunde E.</div>
-            <div class="row-sub">3 shared slots</div>
-          </div>
-        </div>
-
-        <div class="section-h">
-          <h3>Join requests</h3>
-        </div>
-        <div class="request">
-          <div class="what"><b>Fola A.</b> wants to join</div>
-          <div class="actions">
-            <button class="btn small secondary">Decline</button>
-            <button class="btn small">Accept</button>
-          </div>
-        </div>
-
-        <div style="margin-top:20px">
-          <button class="btn block">Open chat</button>
-        </div>
-        <div class="actions-row">
-          <button class="btn small secondary">Files</button>
-          <button class="btn small secondary">Invite</button>
-        </div>
-        <div style="margin-top:8px; text-align:center">
-          <button class="btn small ghost" style="color:var(--flame)">Leave group</button>
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <a class="round glass" href="groups.html" aria-label="Back"><i data-icon="chevron-left"></i></a>
+          <a class="round glass" href="#" aria-label="More"><i data-icon="more"></i></a>
         </div>
       </div>
+
+      <div class="sheet">
+        <div class="gid">
+          <span class="tile c1">MTH</span>
+          <h2>MTH 111 Squad</h2>
+          <div class="meta">MTH 111 <span class="dot"></span> 5 members <span class="badge active">Active</span></div>
+        </div>
+
+        <div class="quick">
+          <a href="chat.html"><i data-icon="message"></i>Chat</a>
+          <a href="#"><i data-icon="folder"></i>Files</a>
+          <a href="#"><i data-icon="user-plus"></i>Invite</a>
+        </div>
+
+        <div class="h-section"><h3>When you can all meet</h3></div>
+        <div class="stack">
+          <div class="item slot"><span class="day"><small>Thu</small><b>2–5</b></span><div class="item-main"><div class="item-title">Thursday afternoon</div><div class="item-sub">All 5 of you are free</div></div></div>
+          <div class="item slot"><span class="day"><small>Sat</small><b>8–11</b></span><div class="item-main"><div class="item-title">Saturday morning</div><div class="item-sub">All 5 of you are free</div></div></div>
+        </div>
+
+        <div class="h-section"><h3>Join requests</h3><span class="n">1</span></div>
+        <div class="card req">
+          <div style="display:flex; align-items:center; gap:12px">
+            <span class="avatar c4">FA</span>
+            <div class="item-main"><div class="item-title">Fola A.</div><div class="item-sub">Statistics <span class="dot"></span> 3 shared slots</div></div>
+            <span class="badge pending">Pending</span>
+          </div>
+          <div class="acts"><button class="btn small outline">Decline</button><button class="btn small">Approve</button></div>
+        </div>
+
+        <div class="h-section"><h3>Members</h3><a href="#">Invite</a></div>
+        <div class="stack">
+          <div class="item"><span class="avatar c2">AD</span><div class="item-main"><div class="item-title">Ada Dimoko</div><div class="item-sub">You</div></div><span class="badge soft">Admin</span></div>
+          <div class="item"><span class="avatar c1">NO</span><div class="item-main"><div class="item-title">Ngozi O.</div><div class="item-sub">4 shared slots</div></div></div>
+          <div class="item"><span class="avatar c3">TE</span><div class="item-main"><div class="item-title">Tunde E.</div><div class="item-sub">3 shared slots</div></div></div>
+        </div>
+
+        <div class="h-section"><h3>Manage</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>Discoverable</b><span>Show in Discover for MTH 111</span></div><span class="switch"><i></i></span></div>
+          <a class="r" href="#"><div class="rt"><b>Rename group</b></div><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#"><div class="rt"><b>Archive group</b><span>Admins only</span></div><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#"><div class="rt"><b style="color:var(--danger)">Leave group</b></div></a>
+        </div>
+      </div>
+
+      <div class="dock"><a class="btn" href="chat.html"><i data-icon="message" class="sm"></i>Open chat</a></div>
     </div>
   </div>
-  <p class="caption">Group detail. Shared free slots first, then people and actions.</p>
+  <p class="caption">Group detail. The group's tile sits over the green band like a profile photo; Open chat floats at the bottom.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

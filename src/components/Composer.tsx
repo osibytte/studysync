@@ -119,7 +119,9 @@ export function Composer({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.proposeText}>{menuOpen ? '×' : '＋'}</Text>
+          <Text style={[styles.proposeText, menuOpen && styles.proposeTextOpen]}>
+            {menuOpen ? '×' : '＋'}
+          </Text>
         </Pressable>
 
         <TextInput
@@ -202,7 +204,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   input: {
@@ -210,32 +212,32 @@ const styles = StyleSheet.create({
     minHeight: MIN_TOUCH,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderColor: colors.surfaceAlt,
+    borderRadius: MIN_TOUCH / 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
     fontSize: fontSize.md,
+    fontFamily: FONT.regular,
     color: colors.text,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceAlt,
     // Android centres single-line text oddly once maxHeight is set.
     textAlignVertical: 'top',
   },
   propose: {
     width: MIN_TOUCH,
     height: MIN_TOUCH,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderRadius: MIN_TOUCH / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceAlt,
   },
-  proposeText: { fontSize: fontSize.lg, fontFamily: FONT.semi, color: colors.primaryDark },
+  proposeText: { fontSize: fontSize.lg, fontFamily: FONT.semi, color: colors.text },
   /** Reads as held down while its menu is showing, so the × has a home. */
-  proposeOpen: { backgroundColor: colors.surface, borderColor: colors.primaryDark },
+  proposeOpen: { backgroundColor: colors.accent },
+  proposeTextOpen: { color: colors.textInverse },
   menu: {
     marginBottom: spacing.sm,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
@@ -257,8 +259,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Ink on lime: white would fail daylight contrast on this fill.
-  sendText: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.text },
+  sendText: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.textInverse },
   inactive: { opacity: 0.45 },
   pressed: { opacity: 0.85 },
   problem: { fontSize: fontSize.xs, color: colors.danger, marginBottom: spacing.xs },

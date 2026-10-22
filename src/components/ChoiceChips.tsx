@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, shadowCard, spacing } from '@/theme';
 
 export interface Choice<T> {
   value: T;
@@ -84,20 +84,21 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacing.xs,
   },
-  row: { paddingVertical: spacing.xs, gap: spacing.sm },
+  row: { paddingVertical: spacing.xs, paddingHorizontal: 2, gap: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
     minHeight: MIN_TOUCH,
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg + 2,
     borderRadius: radius.pill,
     borderWidth: 1.5,
-    borderColor: colors.borderStrong,
+    borderColor: colors.surface,
     backgroundColor: colors.surface,
+    ...shadowCard,
   },
-  // Selected = lime with ink text, matching the primary button.
+  // Selected = ink with white text, matching the primary button.
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipDisabled: { opacity: 0.55 },
-  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
-  chipTextActive: { color: colors.text },
+  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textSecondary },
+  chipTextActive: { color: colors.textInverse },
 });

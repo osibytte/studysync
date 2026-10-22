@@ -6,136 +6,81 @@
 <title>Groups · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .invite {
-    background: var(--flame-soft);
-    border: 1.5px solid var(--flame);
-    border-radius: 22px;
-    padding: 14px 16px;
-  }
-  .invite .who { font-size: 12px; font-weight: 700; color: var(--flame); text-transform: uppercase; letter-spacing: 0.4px; }
-  .invite .what { font-size: 15px; font-weight: 600; margin-top: 3px; }
-  .invite .what b { font-weight: 700; }
-  .invite .actions { display: flex; gap: 10px; margin-top: 12px; }
-  .invite .actions .btn { flex: 1; }
-
-  .tilegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .action {
-    background: #fff; border: 1.5px solid var(--border); border-radius: 22px;
-    padding: 15px 16px; position: relative;
-    text-decoration: none; color: inherit; display: block;
-  }
-  .action .aicon { margin-bottom: 10px; }
-  .action b { font-size: 15px; font-weight: 700; display: block; }
-  .action span { font-size: 12.5px; font-weight: 500; color: var(--muted); display: block; margin-top: 3px; line-height: 1.4; }
+  .ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 20px 20px 0; }
+  .ways a { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px; border-radius: 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); font-size: 13px; font-weight: 600; }
+  .ways .ic { color: #A6E3B8; }
+  .invite { padding: 16px; }
+  .invite .top { display: flex; align-items: center; gap: 12px; }
+  .invite .acts { display: flex; gap: 8px; margin-top: 14px; }
+  .invite .acts .btn { flex: 1; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <h1 style="font-size:26px; font-weight:700">Your groups</h1>
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div><h1>Groups</h1><div class="sub">3 groups across 3 courses</div></div>
+          <a class="round glass" href="create.html" aria-label="Create a group"><i data-icon="plus"></i></a>
+        </div>
+        <div class="ways">
+          <a href="discover.html"><i data-icon="search"></i>Discover open groups</a>
+          <a href="match.html"><i data-icon="zap"></i>Get matched</a>
+          <a href="create.html"><i data-icon="plus"></i>Start a group</a>
+        </div>
+      </div>
 
-        <div class="invite" style="margin-top:12px">
-          <div class="who">Invitation</div>
-          <div class="what">Chidi invited you to <b>CHM 101 Crew</b></div>
-          <div class="actions">
-            <button class="btn small secondary">Decline</button>
+      <div class="sheet">
+        <div class="h-section"><h3>Invitations</h3><span class="n">1</span></div>
+        <div class="card invite">
+          <div class="top">
+            <span class="avatar c5">CN</span>
+            <div class="item-main">
+              <div class="item-title">CHM 101 Crew</div>
+              <div class="item-sub">From Chidi N. <span class="dot"></span> 3 members</div>
+            </div>
+            <span class="badge pending">Pending</span>
+          </div>
+          <div class="acts">
+            <button class="btn small outline">Decline</button>
             <button class="btn small">Accept</button>
           </div>
         </div>
 
-        <div class="section-h">
-          <h3>Squads</h3>
-        </div>
-        <a class="card row-card" href="chat.html">
-          <div class="tile">MTH</div>
-          <div class="row-main">
-            <div class="row-title">MTH 111 Squad <span class="badge">2</span></div>
-            <div class="row-sub">5 members · <span class="pill active">Active</span></div>
-          </div>
-          <span class="chev">›</span>
-        </a>
-        <a class="card row-card" href="chat.html">
-          <div class="tile mango">PHY</div>
-          <div class="row-main">
-            <div class="row-title">PHY 101 Night Owls</div>
-            <div class="row-sub">4 members · <span class="pill forming">Forming</span></div>
-          </div>
-          <span class="chev">›</span>
-        </a>
-        <a class="card row-card" href="chat.html">
-          <div class="tile lime">CSC</div>
-          <div class="row-main">
-            <div class="row-title">CSC 121 Underground</div>
-            <div class="row-sub">6 members · <span class="pill dormant">Dormant</span></div>
-          </div>
-          <span class="chev">›</span>
-        </a>
-
-        <div class="section-h">
-          <h3>Find more</h3>
-        </div>
-        <div class="tilegrid">
-          <a class="action" href="#">
-            <span class="aicon" style="color:var(--primary-dark)">
-              <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </span>
-            <b>Discover</b>
-            <span>Open groups in your courses</span>
+        <div class="h-section"><h3>Your groups</h3><span class="n">3</span></div>
+        <div class="stack">
+          <a class="item" href="group.html">
+            <span class="tile c1">MTH</span>
+            <div class="item-main">
+              <div class="item-title">MTH 111 Squad</div>
+              <div class="item-sub">5 members <span class="dot"></span> 2 unread</div>
+            </div>
+            <span class="badge active">Active</span>
           </a>
-          <a class="action" href="#">
-            <span class="aicon" style="color:var(--accent-deep)">
-              <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-            </span>
-            <b>Create</b>
-            <span>Start your own group</span>
+          <a class="item" href="group.html">
+            <span class="tile c2">PHY</span>
+            <div class="item-main">
+              <div class="item-title">PHY 101 Night Owls</div>
+              <div class="item-sub">4 members</div>
+            </div>
+            <span class="badge forming">Forming</span>
           </a>
-          <a class="action" href="#">
-            <span class="aicon" style="color:var(--flame)">
-              <svg class="ic" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            </span>
-            <b>Get matched</b>
-            <span>Matched by shared free slots</span>
-          </a>
-          <a class="action" href="#">
-            <span class="aicon" style="color:var(--success)">
-              <svg class="ic" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            </span>
-            <span class="badge" style="position:absolute; top:13px; right:14px">1</span>
-            <b>Invitations</b>
-            <span>1 waiting</span>
+          <a class="item" href="group.html">
+            <span class="tile c3">CSC</span>
+            <div class="item-main">
+              <div class="item-title">CSC 121 Underground</div>
+              <div class="item-sub">6 members <span class="dot"></span> quiet for 2 weeks</div>
+            </div>
+            <span class="badge dormant">Dormant</span>
           </a>
         </div>
       </div>
 
-      <div class="tabbar">
-        <a class="tab" href="home.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          Home
-        </a>
-        <a class="tab active" href="groups.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          Groups
-        </a>
-        <a class="tab" href="#">
-          <span class="tabbadge">3</span>
-          <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          Inbox
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Profile
-        </a>
-      </div>
+      <nav class="tabbar" data-active="groups"></nav>
     </div>
   </div>
-  <p class="caption">Groups screen.</p>
+  <p class="caption">Groups. Three ways to find a group in the band, invitations you owe an answer, then each group as its own card with a solid status badge.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

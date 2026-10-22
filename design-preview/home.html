@@ -5,112 +5,106 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
+<style>
+  .avail { margin: 22px 20px 0; padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
+  .avail .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .avail b { font-size: 15px; font-weight: 700; }
+  .avail a { font-size: 13px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
+  .feature { position: relative; overflow: hidden; border-radius: 28px; padding: 20px; background: var(--ink); color: #fff; box-shadow: var(--shadow-float); }
+  .feature .code { position: absolute; right: -10px; top: 6px; font-size: 92px; font-weight: 800; letter-spacing: -0.05em; color: rgba(255,255,255,0.06); line-height: 1; pointer-events: none; }
+  .feature .kicker { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500; }
+  .feature h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; }
+  .feature .last { font-size: 14px; color: rgba(255,255,255,0.78); margin-top: 6px; }
+  .feature .people { display: flex; align-items: center; margin-top: 18px; }
+  .feature .people .avatar { border: 2px solid var(--ink); margin-left: -8px; }
+  .feature .people .avatar:first-child { margin-left: 0; }
+  .feature .people small { margin-left: 10px; font-size: 13px; color: rgba(255,255,255,0.7); }
+  .feature .go { display: flex; align-items: center; gap: 8px; margin-top: 20px; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 6px 6px 20px; }
+  .feature .go > span:first-child { flex: 1; font-size: 15px; font-weight: 600; }
+  .feature .go .round { background: #fff; color: var(--ink); box-shadow: none; }
+</style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <div class="home-top">
-          <div class="home-id">
-            <div class="logo-tile">
-              <svg class="ic lg" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-            </div>
-            <div>
-              <h1>Hi, Ada</h1>
-              <div class="sub">Computer Science</div>
-            </div>
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div>
+            <h1>Hello, Ada</h1>
+            <div class="sub">Computer Science</div>
           </div>
-          <a class="inbox" href="#" aria-label="Notifications, 3 unread">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span class="tabbadge">3</span>
+          <div class="band-actions">
+            <a class="round glass" href="notifications.html" aria-label="Notifications, 3 unread"><i data-icon="bell"></i><span class="badge-num">3</span></a>
+            <a href="profile.html"><span class="avatar c2" style="border:2px solid rgba(255,255,255,.5)">AD</span></a>
+          </div>
+        </div>
+        <div class="avail">
+          <div class="top"><b>13 free slots a week</b><a href="onboarding.html">Edit</a></div>
+          <div class="week">
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Mon</span></div>
+            <div class="d"><i class="on"></i><i></i><i class="on"></i><i class="on"></i><span>Tue</span></div>
+            <div class="d"><i></i><i></i><i class="on"></i><i></i><span>Wed</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i class="on"></i><span>Thu</span></div>
+            <div class="d"><i></i><i class="on"></i><i class="on"></i><i></i><span>Fri</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Sat</span></div>
+            <div class="d"><i></i><i></i><i></i><i></i><span>Sun</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="h-section"><h3>Your courses</h3><a href="profile.html">Edit</a></div>
+        <div class="chips">
+          <span class="chip">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+          <span class="chip">CHM 101</span>
+        </div>
+
+        <div class="h-section"><h3>Your groups</h3><a href="groups.html">See all</a></div>
+        <a class="feature" href="chat.html">
+          <span class="code">MTH</span>
+          <span class="kicker">MTH 111 <span class="badge active">Active</span></span>
+          <h2>MTH 111 Squad</h2>
+          <p class="last">Tunde: I'm in. Library at 4?</p>
+          <div class="people">
+            <span class="avatar sm c2">AD</span>
+            <span class="avatar sm c1">NO</span>
+            <span class="avatar sm c3">TE</span>
+            <span class="avatar sm c4">FA</span>
+            <small>5 members · 2 unread</small>
+          </div>
+          <div class="go"><span>Open chat</span><span class="round"><i data-icon="arrow"></i></span></div>
+        </a>
+
+        <div class="stack" style="margin-top:10px">
+          <a class="item" href="group.html">
+            <span class="tile c2">PHY</span>
+            <div class="item-main">
+              <div class="item-title">PHY 101 Night Owls</div>
+              <div class="item-sub">4 members <span class="dot"></span> Forming</div>
+            </div>
+            <span class="round sm"><i data-icon="chevron-right" class="sm"></i></span>
+          </a>
+          <a class="item" href="groups.html">
+            <span class="avatar c5">CN</span>
+            <div class="item-main">
+              <div class="item-title">Invitation to CHM 101 Crew</div>
+              <div class="item-sub">From Chidi N.</div>
+            </div>
+            <span class="badge pending">New</span>
           </a>
         </div>
 
-        <div class="stats">
-          <div class="stat"><b>2</b><span>Groups</span></div>
-          <div class="stat"><b>4</b><span>Courses</span></div>
-          <div class="stat"><b>13</b><span>Free slots</span></div>
-        </div>
-
-        <div class="section-h">
-          <h3>Your groups</h3>
-          <a href="groups.html">See all</a>
-        </div>
-        <a class="card row-card" href="chat.html">
-          <div class="tile">MTH</div>
-          <div class="row-main">
-            <div class="row-title">MTH 111 Squad <span class="badge">2</span></div>
-            <div class="row-sub">5 members · <span class="pill active">Active</span></div>
-          </div>
-          <span class="chev">›</span>
-        </a>
-        <a class="card row-card" href="chat.html">
-          <div class="tile mango">PHY</div>
-          <div class="row-main">
-            <div class="row-title">PHY 101 Night Owls</div>
-            <div class="row-sub">4 members · <span class="pill forming">Forming</span></div>
-          </div>
-          <span class="chev">›</span>
-        </a>
-
-        <div class="section-h">
-          <h3>Your courses</h3>
-          <a href="#">Edit</a>
-        </div>
-        <div class="chiprow">
-          <span class="chip selected">MTH 111</span>
-          <span class="chip">PHY 101</span>
-          <span class="chip">CSC 121</span>
-          <span class="chip dashed">+ Add</span>
-        </div>
-
-        <div class="section-h">
-          <h3>This week</h3>
-        </div>
-        <div class="card hero">
-          <div>
-            <b>You're free in 13 slots</b>
-            <p>Used when matching you with others.</p>
-            <div class="daydots">
-              <i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i>
-            </div>
-          </div>
-          <a href="onboarding.html">Edit</a>
-        </div>
-
-        <div style="margin-top:22px">
-          <button class="btn block">Find study partners</button>
-        </div>
+        <a class="btn block" href="match.html" style="margin-top:20px"><i data-icon="zap" class="sm"></i>Find study partners</a>
       </div>
 
-      <div class="tabbar">
-        <a class="tab active" href="home.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          Home
-        </a>
-        <a class="tab" href="groups.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          Groups
-        </a>
-        <a class="tab" href="#">
-          <span class="tabbadge">3</span>
-          <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          Inbox
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Profile
-        </a>
-      </div>
+      <nav class="tabbar" data-active="home"></nav>
     </div>
   </div>
-  <p class="caption">Home screen with the new tab bar.</p>
+  <p class="caption">Home. Your week lives in the green band; your most active group is the big card, the rest follow as separate cards.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>
