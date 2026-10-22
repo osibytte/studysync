@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import type { Tabs } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { showTabBarFor, type TabRouteLike } from '@/lib/tabBar';
 import { FONT, colors, shadowFloat } from '@/theme';
 
 type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -26,13 +27,14 @@ const FULL_SCREEN = new Set(['notification-settings', 'courses']);
  *
  * It steps aside on any page deeper than a tab's root (a group, its chat, its
  * files): those have their own pinned actions and the composer, and a bar
- * floating over a text field is a mis-tap waiting to happen.
+ * floating over a text field is a mis-tap waiting to happen. `showTabBarFor`
+ * decides by the focused page's name, since a page opened across tabs sits
+ * alone in its stack at index 0.
  */
 export function FloatingTabBar({ state, descriptors, navigation, insets }: TabBarProps) {
   const focused = state.routes[state.index];
   if (FULL_SCREEN.has(focused.name)) return null;
-  const nested = focused.state as { index?: number } | undefined;
-  if (nested && (nested.index ?? 0) > 0) return null;
+  if (!showTabBarFor(focused as TabRouteLike)) return null;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 14 }]}>
