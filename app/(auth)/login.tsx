@@ -2,7 +2,7 @@ import { Link } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
-import { Screen } from '@/components/Screen';
+import { AuthShell } from '@/components/AuthShell';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/context/AuthContext';
 import { friendlyError } from '@/lib/supabase';
@@ -45,7 +45,10 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen title="StudySync" subtitle="Find study partners on your courses at UI." centered>
+    <AuthShell
+      title="Welcome back to StudySync"
+      lead="Sign in with your school email to see your groups."
+    >
       <View style={styles.form}>
         <TextField
           label="Email"
@@ -90,12 +93,12 @@ export default function LoginScreen() {
           </Link>
         </View>
       </View>
-    </Screen>
+    </AuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  form: { marginTop: spacing.md },
+  form: {},
   formError: {
     color: colors.danger,
     fontSize: fontSize.sm,
@@ -108,5 +111,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   footerText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted },
-  link: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.primaryDark },
+  link: {
+    fontSize: fontSize.sm,
+    fontFamily: FONT.bold,
+    color: colors.text,
+    textDecorationLine: 'underline',
+  },
 });

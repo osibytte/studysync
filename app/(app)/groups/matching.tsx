@@ -21,7 +21,7 @@ import {
 } from '@/lib/groupRules';
 import { requestMatching } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing, shadowCard } from '@/theme';
 import type { UserCourseWithDetail } from '@/types/database';
 
 /**
@@ -119,7 +119,7 @@ export default function ApplyForMatchingScreen() {
     <Screen
       title="Apply to be matched"
       subtitle="Ask the system to place you in a group, one course at a time."
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {windowLoading && !matchingWindow && !unavailable ? (
         <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
@@ -271,17 +271,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    ...shadowCard,
   },
-  bannerOpen: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  bannerOpen: { backgroundColor: colors.primarySoft },
   bannerText: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
   card: {
     marginTop: spacing.md,
     padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
   cardTop: {
     flexDirection: 'row',

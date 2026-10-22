@@ -14,6 +14,8 @@ import { Composer } from '@/components/Composer';
 import { FileCard } from '@/components/FileCard';
 import { MessageBubble } from '@/components/MessageBubble';
 import { ProposeTimeSheet, type ProposalInput } from '@/components/ProposeTimeSheet';
+import { Initials, courseTag } from '@/components/Initials';
+import { RoundButton } from '@/components/RoundButton';
 import { Screen } from '@/components/Screen';
 import { SessionCard } from '@/components/SessionCard';
 import { useAuth } from '@/context/AuthContext';
@@ -728,17 +730,14 @@ export default function ChatScreen() {
       }
     >
       <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={8}
-          style={styles.back}
-        >
-          <Feather name="chevron-left" size={26} color={colors.primaryDark} />
-        </Pressable>
+        <RoundButton icon="chevron-left" label="Back" onPress={() => router.back()} />
+        <Initials
+          text={courseTag(group?.course?.course_code)}
+          colorKey={group?.group_id ?? gid}
+          size={38}
+        />
         <View style={styles.headerText}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
+          <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
             {group?.group_name ?? 'Conversation'}
           </Text>
           <Text style={styles.headerMeta} numberOfLines={1}>
@@ -751,18 +750,16 @@ export default function ChatScreen() {
           most: files are shared here, so "where did that PDF go" is asked here.
         */}
         {!!gid && (
-          <Pressable
+          <RoundButton
+            icon="folder"
+            label="Shared files"
             onPress={() => router.push(`/(app)/groups/${gid}/files`)}
-            accessibilityRole="button"
-            accessibilityLabel="Shared files"
-            accessibilityHint="Every file this group has shared, newest first"
-            style={styles.headerAction}
-          >
-            <Text style={styles.headerActionText}>Files</Text>
-          </Pressable>
+          />
         )}
       </View>
 
+      {/* The conversation sits on a white sheet with a rounded top, under the header. */}
+      <View style={styles.sheet}>
       {(!!actionError || !!status) && (
         <View style={styles.banner}>
           <Text
@@ -807,6 +804,7 @@ export default function ChatScreen() {
           }
         />
       )}
+      </View>
     </Screen>
   );
 }
@@ -820,25 +818,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  back: { width: 32, height: 44, alignItems: 'flex-start', justifyContent: 'center' },
-  headerText: { flex: 1 },
-  headerTitle: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
-  headerMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
-  /** Same 44pt as the Back target opposite it, so the header row stays even. */
-  headerAction: {
-    minHeight: MIN_TOUCH,
-    justifyContent: 'center',
-    paddingLeft: spacing.sm,
-  },
-  headerActionText: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
-  banner: {
+    gap: spacing.sm + 2,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerText: { flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: fontSize.md + 1, fontFamily: FONT.bold, color: colors.text },
+  headerMeta: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: 2 },
+  sheet: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  banner: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     backgroundColor: colors.surface,
   },
   bannerError: { fontSize: fontSize.xs, color: colors.danger, lineHeight: 18 },
@@ -851,7 +848,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
   },
-  list: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  list: { paddingHorizontal: spacing.md + 2, paddingVertical: spacing.md },
   day: { alignItems: 'center', marginVertical: spacing.md },
   dayText: {
     fontSize: fontSize.xs,

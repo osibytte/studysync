@@ -37,16 +37,16 @@ export function StepHeader({ step, total }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginBottom: spacing.lg },
-  track: { flexDirection: 'row', marginBottom: spacing.xs, gap: 4 },
+  wrapper: { marginBottom: spacing.xl },
+  track: { flexDirection: 'row', marginBottom: spacing.md, gap: 6 },
   segment: { flex: 1, height: 6, borderRadius: radius.pill },
-  // Done = lime, current = periwinkle, upcoming = sand.
+  // Done and current = ink, upcoming = grey.
   segmentDone: { backgroundColor: colors.accent },
-  segmentCurrent: { backgroundColor: colors.primary },
-  segmentTodo: { backgroundColor: colors.surfaceAlt },
+  segmentCurrent: { backgroundColor: colors.accent },
+  segmentTodo: { backgroundColor: colors.borderStrong },
   label: {
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    color: colors.primaryDark,
     fontFamily: FONT.semi,
   },
 });

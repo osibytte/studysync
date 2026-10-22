@@ -1,0 +1,1236 @@
+<title>StudySync Screen Mockups</title>
+<style>
+/* ============================================================
+   StudySync redesign preview, shared styles (v4: Green & Ink).
+
+   Built from the user's two references:
+   - TripGlide: near-black pill actions and selected chips, a
+     floating black tab bar with a white active circle, large
+     soft-cornered cards, round icon buttons, round arrow buttons.
+   - Healthtech: a deep green brand band at the top, content on a
+     lighter sheet that overlaps it with rounded top corners,
+     separate white cards, solid status badges, a centred
+     avatar profile header.
+
+   Montserrat for text, League Spartan for headings and names. Values mirror what src/theme.ts
+   will carry. Kept from earlier versions: 44pt minimum targets,
+   AA contrast for daylight use, Feather icons, no emoji.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@700;800&family=Montserrat:wght@400;500;600&display=swap');
+
+:root {
+  /* ink: the action colour (buttons, selected chips, tab bar, my bubbles) */
+  --ink: #17191A;
+  --ink-2: #2B2E30;
+
+  /* green: the brand (header band, active status, availability) */
+  --green-900: #0F3B26;
+  --green-800: #154D32;
+  --green-700: #1C6440;
+  --green-600: #23794E;
+  --green-soft: #E2F0E7;
+  --green-tint: #F1F7F3;
+
+  /* neutrals, slightly green-biased */
+  --canvas: #EEF0ED;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6F4;
+  --line: #E3E6E1;
+  --line-strong: #CDD2CB;
+
+  --text: #17191A;
+  --text-2: #4B504C;   /* 8.3:1 on white */
+  --text-3: #6C716C;   /* 5.0:1 on white */
+  --text-4: #A3A8A2;
+
+  /* status, solid badges with white text */
+  --st-green: #1E7A4C;
+  --st-blue: #2457D6;
+  --st-amber: #B45309;
+  --st-grey: #6C716C;
+  --danger: #D93A3F;
+  --danger-soft: #FDECEC;
+
+  --shadow-card: 0 1px 2px rgba(23, 25, 26, 0.04), 0 4px 14px rgba(23, 25, 26, 0.04);
+  --shadow-float: 0 10px 30px rgba(23, 25, 26, 0.22);
+
+  --r-card: 20px;
+  --r-big: 28px;
+  --r-field: 16px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; }
+
+/* ---------- icons ---------- */
+
+.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; display: block; }
+.ic.lg { width: 24px; height: 24px; }
+.ic.sm { width: 16px; height: 16px; }
+.ic.xs { width: 14px; height: 14px; }
+
+/* ---------- phone frame ---------- */
+
+.phone {
+  width: 384px;
+  background: var(--canvas);
+  border-radius: 44px;
+  box-shadow: 0 0 0 10px #17191A, 0 30px 70px rgba(23, 25, 26, 0.28);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.caption { color: var(--text-2); font-size: 13px; font-weight: 500; margin-top: 22px; text-align: center; max-width: 340px; line-height: 1.5; }
+
+.statusbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 28px 6px;
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
+.statusbar.light { color: #fff; }
+.sig { display: flex; gap: 2px; align-items: flex-end; }
+.sig i { display: block; width: 3px; background: currentColor; border-radius: 1px; }
+.sig i:nth-child(1) { height: 5px; } .sig i:nth-child(2) { height: 8px; } .sig i:nth-child(3) { height: 11px; }
+.batt { width: 23px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; margin-left: 8px; opacity: .9; }
+.batt::after { content: ''; position: absolute; inset: 1.5px; right: 5px; background: currentColor; border-radius: 1px; }
+
+.screen { display: flex; flex-direction: column; min-height: 812px; position: relative; }
+
+/* ---------- green band + overlapping sheet (tab screens) ---------- */
+
+.band {
+  background:
+    radial-gradient(120% 90% at 85% 0%, rgba(120, 190, 140, 0.35) 0%, rgba(120, 190, 140, 0) 60%),
+    linear-gradient(160deg, var(--green-700) 0%, var(--green-900) 100%);
+  color: #fff;
+  padding-bottom: 40px;
+}
+.band-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px 0; }
+.band .brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; }
+.band .brand .mark { width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; }
+.band h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.band .sub { font-size: 14px; color: rgba(255,255,255,0.78); margin-top: 2px; }
+.band-actions { display: flex; gap: 8px; align-items: center; }
+
+.sheet {
+  background: var(--canvas);
+  border-radius: var(--r-big) var(--r-big) 0 0;
+  margin-top: -24px;
+  flex: 1;
+  padding: 24px 16px 120px;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.sheet.plain { margin-top: 0; border-radius: 0; padding-top: 8px; }
+
+/* ---------- round buttons ---------- */
+
+.round {
+  position: relative;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: var(--surface); color: var(--text); border: none;
+  box-shadow: var(--shadow-card); cursor: pointer;
+}
+.round.glass { background: rgba(255,255,255,0.16); color: #fff; box-shadow: none; }
+.round.dark { background: var(--ink); color: #fff; box-shadow: none; }
+.round.sm { width: 36px; height: 36px; }
+.round .badge-num {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--danger); color: #fff; border: 2px solid var(--green-800);
+  font-size: 10px; font-weight: 700; line-height: 14px; text-align: center;
+}
+
+/* ---------- pushed-screen header ---------- */
+
+.pushhead { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; padding: 8px 16px 12px; }
+.pushhead .t { text-align: center; min-width: 0; }
+.pushhead .t b { display: block; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pushhead .t span { display: block; font-size: 13px; color: var(--text-3); margin-top: 1px; }
+
+/* ---------- type ---------- */
+
+.h-section { display: flex; justify-content: space-between; align-items: center; margin: 26px 2px 12px; }
+.h-section:first-child { margin-top: 0; }
+.h-section h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
+.h-section a { font-size: 14px; font-weight: 600; color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.h-section .n { font-size: 14px; font-weight: 600; color: var(--text-3); }
+.label { font-size: 13px; font-weight: 600; color: var(--text-3); }
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 52px; padding: 0 24px; border-radius: 999px;
+  background: var(--ink); color: #fff; border: 1.5px solid var(--ink);
+  font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.btn.outline { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+.btn.green { background: var(--green-700); border-color: var(--green-700); }
+.btn.white { background: #fff; color: var(--text); border-color: #fff; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.btn.danger { background: var(--surface); color: var(--danger); border-color: #F4C7C8; }
+.btn.small { height: 40px; padding: 0 16px; font-size: 14px; }
+.btn.xs { height: 34px; padding: 0 14px; font-size: 13px; }
+.btn.block { display: flex; width: 100%; }
+.btn[disabled] { background: var(--surface-2); color: var(--text-4); border-color: var(--line); cursor: default; }
+
+/* pinned bottom action, floats over content like the "Book a tour" bar */
+.dock { position: absolute; left: 16px; right: 16px; bottom: 28px; z-index: 3; display: flex; gap: 10px; }
+.dock .btn { flex: 1; height: 56px; box-shadow: var(--shadow-float); }
+.dock .btn.outline { box-shadow: var(--shadow-card); }
+
+/* ---------- cards ---------- */
+
+.card { background: var(--surface); border-radius: var(--r-card); padding: 16px; box-shadow: var(--shadow-card); }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+
+/* person/group row as its own card */
+.item { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--r-card); padding: 14px 14px; box-shadow: var(--shadow-card); min-height: 72px; }
+.item-main { flex: 1; min-width: 0; }
+.item-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { font-size: 13px; color: var(--text-3); margin-top: 3px; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.item-meta time { font-size: 12px; color: var(--text-3); font-weight: 500; }
+.dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); display: inline-block; flex-shrink: 0; }
+
+/* inside one card: key/value or settings rows */
+.rows { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 4px 16px; }
+.r { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 0; }
+.r + .r { border-top: 1px solid var(--line); }
+.r .k { font-size: 14px; color: var(--text-3); font-weight: 500; flex: 1; }
+.r .v { font-size: 15px; font-weight: 600; text-align: right; }
+.r .rt { flex: 1; min-width: 0; }
+.r .rt b { display: block; font-size: 15px; font-weight: 600; }
+.r .rt span { display: block; font-size: 13px; color: var(--text-3); margin-top: 2px; }
+
+/* group header line, like "Leslie Black  [icons]" in the reference */
+.groupline { display: flex; align-items: center; gap: 10px; margin: 22px 4px 10px; }
+.groupline b { flex: 1; font-size: 15px; font-weight: 600; color: var(--text-2); }
+
+/* ---------- tiles and avatars ---------- */
+
+.tile { width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.02em; }
+.tile.sm { width: 36px; height: 36px; border-radius: 12px; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; font-weight: 700; }
+.avatar.xs { width: 26px; height: 26px; font-size: 10px; }
+.avatar.sm { width: 32px; height: 32px; font-size: 11px; }
+.avatar.xl { width: 96px; height: 96px; font-size: 30px; border: 4px solid #fff; box-shadow: var(--shadow-card); }
+
+/* warm, varied hues so tiles read as distinct groups/people */
+.c1 { background: #DCEFE3; color: #145232; }
+.c2 { background: #FDE8D7; color: #8A3A0B; }
+.c3 { background: #DDE8FB; color: #1B44A8; }
+.c4 { background: #F6E0EC; color: #8B1F55; }
+.c5 { background: #EDE6D6; color: #5F4614; }
+.c6 { background: #E6E3F7; color: #4A31A6; }
+.cink { background: var(--ink); color: #fff; }
+
+/* ---------- badges, chips ---------- */
+
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; flex-shrink: 0; }
+.badge.active { background: var(--st-green); }
+.badge.forming, .badge.pending { background: var(--st-blue); }
+.badge.waiting { background: var(--st-amber); }
+.badge.dormant { background: var(--surface-2); color: var(--text-2); }
+.badge.soft { background: var(--green-soft); color: var(--green-800); }
+.count { min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
+.chip { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 999px; background: var(--surface); color: var(--text-2); font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: var(--shadow-card); }
+.chip.on { background: var(--ink); color: #fff; box-shadow: none; }
+
+/* pill tabs, like "Tour schedule / Accommodation" */
+.ptabs { display: flex; gap: 6px; background: var(--surface); padding: 5px; border-radius: 999px; box-shadow: var(--shadow-card); }
+.ptabs span { flex: 1; text-align: center; height: 38px; line-height: 38px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text-3); }
+.ptabs span.on { background: var(--ink); color: #fff; }
+
+/* ---------- forms ---------- */
+
+.fieldwrap { margin-top: 16px; }
+.flabel { display: block; font-size: 14px; font-weight: 600; margin: 0 4px 8px; }
+.field { display: flex; align-items: center; gap: 10px; width: 100%; height: 56px; padding: 0 18px; background: var(--surface); border: 1.5px solid var(--surface); border-radius: var(--r-field); font-size: 15px; font-weight: 500; color: var(--text); box-shadow: var(--shadow-card); }
+.field.ph { color: var(--text-4); }
+.field.focus { border-color: var(--ink); }
+.field .ic { color: var(--text-3); }
+.hint { font-size: 13px; color: var(--text-3); margin: 8px 4px 0; }
+
+.switch { width: 48px; height: 28px; border-radius: 999px; background: var(--green-700); position: relative; flex-shrink: 0; }
+.switch.off { background: var(--line-strong); }
+.switch i { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.switch.off i { right: auto; left: 3px; }
+
+.note { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--text-2); padding: 14px 16px; border-radius: var(--r-field); background: var(--green-tint); border: 1px solid var(--green-soft); }
+.note .ic { color: var(--green-700); margin-top: 1px; }
+
+/* ---------- floating tab bar ---------- */
+
+.tabbar {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 4;
+  display: flex; gap: 6px; padding: 7px;
+  background: var(--ink); border-radius: 999px;
+  box-shadow: var(--shadow-float);
+}
+.tab { position: relative; width: 56px; height: 52px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.72); }
+.tab.active { background: #fff; color: var(--ink); width: 52px; }
+.tab .tabbadge { position: absolute; top: 6px; right: 9px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; border: 2px solid var(--ink); font-size: 9px; font-weight: 700; line-height: 12px; text-align: center; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- availability ---------- */
+
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.week .d { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.week .d i { width: 100%; height: 10px; border-radius: 4px; background: rgba(255,255,255,0.14); }
+.week .d i.on { background: #A6E3B8; }
+.week .d span { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.7); margin-top: 4px; }
+.week.on-light .d i { background: var(--surface-2); }
+.week.on-light .d i.on { background: var(--green-600); }
+.week.on-light .d span { color: var(--text-3); }
+
+/* ---------- heading face ---------- */
+/* Everything set bold is a heading, a name or a number: League Spartan. */
+h1, h2, h3, b, .item-title, .feature h2, .code, .pct, .time, .count, .badge-num,
+.tile, .avatar, .score, .stat b {
+  font-family: 'League Spartan', 'Montserrat', 'Segoe UI', sans-serif;
+  letter-spacing: -0.005em;
+}
+
+/* Gallery chrome. Phones stay light: they show a light-mode app.
+   Layout: sticky jump bar, then one row of phones per flow. */
+:root { --g-bg: #E4E8E3; --g-text: #17191A; --g-muted: #4B504C; --g-line: #CDD2CB; --g-chip: #FFFFFF; --g-accent: #1C6440; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --g-bg: #0C111D; --g-text: #F5F5F6; --g-muted: #94969C; --g-line: #333741; --g-chip: #161B26; --g-accent: #8FD3A6; color-scheme: dark; } }
+:root[data-theme="dark"] { --g-bg: #0C111D; --g-text: #F5F5F6; --g-muted: #94969C; --g-line: #333741; --g-chip: #161B26; --g-accent: #8FD3A6; color-scheme: dark; }
+body { margin: 0; background: var(--g-bg); color: var(--g-text); font-family: 'Montserrat', 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; padding-inline: 16px; padding-block: 40px 72px; }
+.wrap { max-width: 1680px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+.intro h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.025em; text-wrap: balance; }
+.intro p { color: var(--g-muted); font-size: 16px; line-height: 1.6; max-width: 62ch; margin-top: 10px; }
+.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-block: 10px; background: var(--g-bg); margin-top: -32px; }
+.jump a { flex-shrink: 0; font-size: 13px; font-weight: 500; color: var(--g-text); background: var(--g-chip); border: 1px solid var(--g-line); border-radius: 999px; padding: 6px 12px; }
+.jump a:hover, .jump a:focus-visible { border-color: var(--g-accent); color: var(--g-accent); outline: none; }
+.group header { border-top: 1px solid var(--g-line); padding-top: 20px; }
+.group h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--g-accent); }
+.group header p { font-size: 15px; color: var(--g-muted); margin-top: 4px; }
+.shots { display: flex; flex-wrap: wrap; gap: 48px 40px; margin-top: 28px; }
+.shot { margin: 0; display: flex; flex-direction: column; gap: 18px; width: 384px; max-width: 100%; scroll-margin-top: 64px; }
+.frame { padding: 10px; }
+.frame .phone { color: #17191A; }
+figcaption b { display: block; font-size: 15px; font-weight: 600; }
+figcaption span { display: block; font-size: 13px; line-height: 1.5; color: var(--g-muted); margin-top: 4px; }
+@media (max-width: 440px) { .frame { zoom: 0.82; padding: 6px; } .shot { width: 100%; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+#s-login .band { padding-bottom: 56px; }
+#s-login .hero { padding: 36px 24px 0; }
+#s-login .hero .mark { width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; }
+#s-login .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; margin-top: 22px; }
+#s-login .hero p { font-size: 15px; color: rgba(255,255,255,0.78); margin-top: 8px; line-height: 1.5; }
+#s-login .sheet { padding: 12px 20px 40px; }
+#s-login .alt { text-align: center; margin-top: 18px; font-size: 14px; color: var(--text-2); }
+#s-login .alt a { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+#s-signup .band { padding-bottom: 56px; }
+#s-signup .hero { padding: 36px 24px 0; }
+#s-signup .hero .mark { width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; }
+#s-signup .hero h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; margin-top: 22px; }
+#s-signup .hero p { font-size: 15px; color: rgba(255,255,255,0.78); margin-top: 8px; line-height: 1.5; }
+#s-signup .sheet { padding: 12px 20px 40px; }
+#s-signup .alt { text-align: center; margin-top: 18px; font-size: 14px; color: var(--text-2); }
+#s-signup .alt a { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+#s-onboarding .progress { display: flex; gap: 6px; flex: 1; margin: 0 8px; }
+#s-onboarding .progress i { flex: 1; height: 6px; border-radius: 3px; background: var(--line-strong); }
+#s-onboarding .progress i.on { background: var(--ink); }
+#s-onboarding .step { font-size: 13px; font-weight: 600; color: var(--green-700); margin-top: 10px; }
+#s-onboarding h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-top: 6px; }
+#s-onboarding .lead { font-size: 15px; color: var(--text-2); line-height: 1.5; margin-top: 8px; }
+#s-onboarding .grid { display: grid; grid-template-columns: 56px repeat(7, 1fr); gap: 5px; align-items: center; }
+#s-onboarding .ghead { text-align: center; font-size: 12px; font-weight: 700; color: var(--text-2); height: 30px; line-height: 30px; }
+#s-onboarding .glab b { font-size: 12px; font-weight: 700; display: block; }
+#s-onboarding .glab span { font-size: 11px; color: var(--text-3); }
+#s-onboarding .cell { height: 46px; border-radius: 12px; background: var(--surface-2); }
+#s-onboarding .cell.on { background: var(--green-700); color: #fff; display: flex; align-items: center; justify-content: center; }
+#s-onboarding .summary { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+#s-onboarding .summary b { font-size: 15px; font-weight: 700; }
+#s-onboarding .summary a { font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+#s-home .avail { margin: 22px 20px 0; padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); }
+#s-home .avail .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+#s-home .avail b { font-size: 15px; font-weight: 700; }
+#s-home .avail a { font-size: 13px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+#s-home .feature { position: relative; overflow: hidden; border-radius: 28px; padding: 20px; background: var(--ink); color: #fff; box-shadow: var(--shadow-float); }
+#s-home .feature .code { position: absolute; right: -10px; top: 6px; font-size: 92px; font-weight: 800; letter-spacing: -0.05em; color: rgba(255,255,255,0.06); line-height: 1; pointer-events: none; }
+#s-home .feature .kicker { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500; }
+#s-home .feature h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; }
+#s-home .feature .last { font-size: 14px; color: rgba(255,255,255,0.78); margin-top: 6px; }
+#s-home .feature .people { display: flex; align-items: center; margin-top: 18px; }
+#s-home .feature .people .avatar { border: 2px solid var(--ink); margin-left: -8px; }
+#s-home .feature .people .avatar:first-child { margin-left: 0; }
+#s-home .feature .people small { margin-left: 10px; font-size: 13px; color: rgba(255,255,255,0.7); }
+#s-home .feature .go { display: flex; align-items: center; gap: 8px; margin-top: 20px; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 6px 6px 20px; }
+#s-home .feature .go > span:first-child { flex: 1; font-size: 15px; font-weight: 600; }
+#s-home .feature .go .round { background: #fff; color: var(--ink); box-shadow: none; }
+#s-groups .ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 20px 20px 0; }
+#s-groups .ways a { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px; border-radius: 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); font-size: 13px; font-weight: 600; }
+#s-groups .ways .ic { color: #A6E3B8; }
+#s-groups .invite { padding: 16px; }
+#s-groups .invite .top { display: flex; align-items: center; gap: 12px; }
+#s-groups .invite .acts { display: flex; gap: 8px; margin-top: 14px; }
+#s-groups .invite .acts .btn { flex: 1; }
+#s-notifications .n-item { align-items: flex-start; }
+#s-notifications .n-item .tile { margin-top: 2px; }
+#s-notifications .n-item p { font-size: 14px; color: var(--text-2); line-height: 1.45; margin-top: 3px; white-space: normal; }
+#s-notifications .n-item.unread { box-shadow: inset 3px 0 0 var(--green-600), var(--shadow-card); }
+#s-notifications .n-item .udot { width: 9px; height: 9px; border-radius: 50%; background: var(--green-600); }
+#s-notifications .end { text-align: center; color: var(--text-3); font-size: 13px; margin-top: 22px; }
+#s-profile .band { padding-bottom: 72px; }
+#s-profile .who { display: flex; flex-direction: column; align-items: center; margin-top: -72px; position: relative; z-index: 1; text-align: center; }
+#s-profile .who h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; margin-top: 12px; }
+#s-profile .who .badge { margin-top: 10px; height: 30px; padding: 0 14px; font-size: 13px; }
+#s-profile .sheet { padding-top: 0; }
+#s-profile .r .v .ic { color: var(--text-3); }
+#s-discover .seats { display: flex; gap: 3px; margin-top: 8px; }
+#s-discover .seats i { width: 14px; height: 6px; border-radius: 3px; background: var(--line); }
+#s-discover .seats i.on { background: var(--green-600); }
+#s-discover .g { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+#s-discover .g .top { display: flex; align-items: center; gap: 12px; }
+#s-match .top-match { position: relative; overflow: hidden; border-radius: 28px; padding: 20px; color: #fff; background: linear-gradient(160deg, var(--green-700), var(--green-900)); box-shadow: var(--shadow-float); }
+#s-match .top-match .pct { position: absolute; right: 18px; top: 14px; font-size: 64px; font-weight: 800; letter-spacing: -0.05em; color: rgba(255,255,255,.14); }
+#s-match .top-match .k { font-size: 13px; font-weight: 600; color: #A6E3B8; }
+#s-match .top-match h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; }
+#s-match .top-match p { font-size: 14px; color: rgba(255,255,255,.78); margin-top: 4px; }
+#s-match .top-match .go { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+#s-match .top-match .go .btn { flex: 1; }
+#s-match .score { font-size: 15px; font-weight: 800; color: var(--green-700); flex-shrink: 0; }
+#s-match .p { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+#s-match .p .top { display: flex; align-items: center; gap: 12px; }
+#s-create .course { display: flex; align-items: center; gap: 12px; }
+#s-create .course.on { box-shadow: 0 0 0 2px var(--ink); }
+#s-create .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); flex-shrink: 0; }
+#s-create .radio.on { border: 7px solid var(--ink); }
+#s-group .band { padding-bottom: 64px; }
+#s-group .gid { display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: -66px; position: relative; z-index: 1; }
+#s-group .gid .tile { width: 84px; height: 84px; border-radius: 26px; font-size: 20px; border: 4px solid #fff; box-shadow: var(--shadow-card); }
+#s-group .gid h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; margin-top: 12px; }
+#s-group .gid .meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--text-3); }
+#s-group .sheet { padding-top: 0; padding-bottom: 110px; }
+#s-group .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; }
+#s-group .quick a { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-card); font-size: 13px; font-weight: 600; }
+#s-group .slot { display: flex; align-items: center; gap: 12px; }
+#s-group .slot .day { width: 52px; height: 56px; border-radius: 14px; background: var(--green-tint); border: 1px solid var(--green-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+#s-group .slot .day small { font-size: 11px; font-weight: 600; color: var(--green-700); text-transform: uppercase; letter-spacing: .04em; }
+#s-group .slot .day b { font-size: 15px; font-weight: 800; color: var(--green-800); }
+#s-group .req .acts { display: flex; gap: 8px; margin-top: 12px; }
+#s-group .req .acts .btn { flex: 1; }
+#s-chat .chead { display: flex; align-items: center; gap: 10px; padding: 8px 16px 12px; }
+#s-chat .chead .who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+#s-chat .chead .who b { display: block; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#s-chat .chead .who span { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+#s-chat .chead .who span i { width: 7px; height: 7px; border-radius: 50%; background: var(--green-600); display: inline-block; }
+#s-chat .body { flex: 1; background: var(--surface); border-radius: 28px 28px 0 0; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+#s-chat .day { align-self: center; font-size: 12px; font-weight: 600; color: var(--text-3); background: var(--surface-2); border-radius: 999px; padding: 5px 12px; margin: 4px 0 8px; }
+#s-chat .msg { display: flex; gap: 8px; max-width: 84%; margin-top: 10px; }
+#s-chat .msg.them { align-self: flex-start; }
+#s-chat .msg.me { align-self: flex-end; flex-direction: column; align-items: flex-end; }
+#s-chat .msg .avatar { align-self: flex-end; }
+#s-chat .msg .name { font-size: 12px; font-weight: 700; color: var(--text-2); margin: 0 0 4px 14px; }
+#s-chat .msg .name time { font-weight: 500; color: var(--text-3); margin-left: 4px; }
+#s-chat .bubble { background: var(--surface-2); padding: 11px 15px; border-radius: 20px 20px 20px 6px; font-size: 15px; line-height: 1.45; }
+#s-chat .msg.me .bubble { background: var(--ink); color: #fff; border-radius: 20px 20px 6px 20px; }
+#s-chat .msg .state { font-size: 11px; color: var(--text-3); margin: 4px 4px 0 0; display: flex; align-items: center; gap: 4px; }
+#s-chat .msg.pending .bubble { opacity: .55; }
+#s-chat .session { margin: 12px 0 2px; border-radius: 24px; padding: 16px; background: var(--green-800); color: #fff; }
+#s-chat .session .top { display: flex; align-items: center; justify-content: space-between; }
+#s-chat .session .kind { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.75); }
+#s-chat .session .time { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-top: 10px; }
+#s-chat .session .sub { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 2px; }
+#s-chat .session .people { display: flex; align-items: center; margin-top: 14px; }
+#s-chat .session .people .avatar { border: 2px solid var(--green-800); margin-left: -7px; }
+#s-chat .session .people .avatar:first-child { margin-left: 0; }
+#s-chat .session .people small { font-size: 12px; color: rgba(255,255,255,.75); margin-left: 8px; }
+#s-chat .session .acts { display: flex; gap: 8px; margin-top: 16px; }
+#s-chat .session .acts .btn { flex: 1; }
+#s-chat .session .btn.glass { background: rgba(255,255,255,.12); border-color: transparent; color: #fff; }
+#s-chat .file { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; background: var(--surface-2); border-radius: 20px 20px 20px 6px; width: 250px; }
+#s-chat .file b { font-size: 14px; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#s-chat .file span { font-size: 12px; color: var(--text-3); }
+#s-chat .composer { display: flex; align-items: center; gap: 8px; padding: 10px 12px 28px; background: var(--surface); border-top: 1px solid var(--line); }
+#s-chat .composer .field { flex: 1; height: 48px; border-radius: 999px; background: var(--surface-2); border-color: var(--surface-2); box-shadow: none; }
+#s-settings .master { display: flex; align-items: center; gap: 14px; border-radius: 24px; padding: 18px; background: linear-gradient(160deg, var(--green-700), var(--green-900)); color: #fff; }
+#s-settings .master b { font-size: 16px; font-weight: 700; display: block; }
+#s-settings .master span { font-size: 13px; color: rgba(255,255,255,.75); }
+#s-settings .master .switch { background: #A6E3B8; }
+#s-settings .foot { font-size: 13px; color: var(--text-3); margin: 10px 4px 0; line-height: 1.45; }
+#s-settings .val { font-size: 15px; font-weight: 600; }
+</style>
+<div class="wrap">
+  <div class="intro">
+    <h1>StudySync screen mockups</h1>
+    <p>Every screen in the Green &amp; Ink redesign: a deep green brand band, content on a soft sheet with separate white cards, near-black pill actions, a floating tab bar, League Spartan headings over Montserrat text. Same features as the app today. Links and tabs inside the phones jump to the matching screen.</p>
+  </div>
+  <nav class="jump" aria-label="Screens"><a href="#s-login">Sign in</a><a href="#s-signup">Create account</a><a href="#s-onboarding">Onboarding</a><a href="#s-home">Home</a><a href="#s-groups">Groups</a><a href="#s-notifications">Inbox</a><a href="#s-profile">Profile</a><a href="#s-discover">Discover</a><a href="#s-match">Get matched</a><a href="#s-create">New group</a><a href="#s-group">Group detail</a><a href="#s-chat">Group chat</a><a href="#s-settings">Notification settings</a></nav>
+  <section class="group">
+  <header><h2>Getting started</h2><p>Sign in, sign up and the first-run availability step.</p></header>
+  <div class="shots"><figure class="shot" id="s-login">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="hero">
+          <span class="mark"><i data-icon="logo" class="lg"></i></span>
+          <h1>Welcome back to StudySync</h1>
+          <p>Sign in with your school email to see your groups.</p>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="fieldwrap">
+          <label class="flabel">Email</label>
+          <div class="field "><i data-icon="mail" class="sm"></i>ada.dimoko@ui.edu.ng</div>
+        </div>
+        <div class="fieldwrap">
+          <label class="flabel">Password</label>
+          <div class="field focus"><i data-icon="shield" class="sm"></i>••••••••••</div>
+        </div>
+
+        <button class="btn block" style="margin-top:24px">Sign in<i data-icon="arrow" class="sm"></i></button>
+        <p class="alt">New here? <a href="#s-signup">Create an account</a></p>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Sign in</b><span>Sign in. Brand band in green, the form on the sheet below it.</span></figcaption>
+</figure><figure class="shot" id="s-signup">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="hero">
+          <span class="mark"><i data-icon="logo" class="lg"></i></span>
+          <h1>Find people to study with</h1>
+          <p>Matched by course and the hours you're free.</p>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="fieldwrap">
+          <label class="flabel">Full name</label>
+          <div class="field ">Ada Dimoko</div>
+        </div>
+        <div class="fieldwrap">
+          <label class="flabel">Department</label>
+          <div class="field ph">e.g. Computer Science</div>
+        </div>
+        <div class="fieldwrap">
+          <label class="flabel">School email</label>
+          <div class="field ">ada.dimoko@ui.edu.ng</div>
+        </div>
+        <div class="fieldwrap">
+          <label class="flabel">Password</label>
+          <div class="field ph">At least 6 characters</div>
+        </div>
+
+        <button class="btn block" style="margin-top:24px">Create account<i data-icon="arrow" class="sm"></i></button>
+        <p class="alt">Already have an account? <a href="#s-login">Sign in</a></p>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Create account</b><span>Create account. If email confirmation is on, a check-your-inbox notice follows.</span></figcaption>
+</figure><figure class="shot" id="s-onboarding">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="pushhead" style="grid-template-columns:44px 1fr 44px">
+        <a class="round" href="#" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="progress"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <span></span>
+      </div>
+
+      <div class="sheet plain" style="padding-bottom:110px">
+        <div class="step">Step 3 of 3</div>
+        <h1>When are you free to study?</h1>
+        <p class="lead">Tap the times that work most weeks. Tap a day to fill or clear it.</p>
+
+        <div class="card" style="margin-top:20px; padding:14px 12px">
+          <div class="grid">
+            <span></span>
+            <span class="ghead">M</span><span class="ghead">T</span><span class="ghead">W</span><span class="ghead">T</span><span class="ghead">F</span><span class="ghead">S</span><span class="ghead">S</span>
+            <span class="glab"><b>Morning</b><span>8–11</span></span>
+            <span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span>
+            <span class="glab"><b>Midday</b><span>11–2</span></span>
+            <span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span>
+            <span class="glab"><b>Afternoon</b><span>2–5</span></span>
+            <span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell"></span>
+            <span class="glab"><b>Evening</b><span>5–8</span></span>
+            <span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell on"><i data-icon="check" class="xs"></i></span><span class="cell"></span><span class="cell"></span><span class="cell"></span>
+          </div>
+          <div class="summary"><b>13 slots a week</b><a href="#">Clear all</a></div>
+        </div>
+        <div class="note" style="margin-top:14px"><i data-icon="info" class="sm"></i><span>You can change this anytime from your profile.</span></div>
+      </div>
+
+      <div class="dock"><button class="btn">Finish<i data-icon="arrow" class="sm"></i></button></div>
+    </div>
+  </div></div>
+  <figcaption><b>Onboarding</b><span>Onboarding, step 3 of 3. One big question, green cells for the times you pick, Finish floating at the bottom.</span></figcaption>
+</figure></div>
+</section><section class="group">
+  <header><h2>Tabs</h2><p>The four places a student lives, each with the bottom tab bar.</p></header>
+  <div class="shots"><figure class="shot" id="s-home">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div>
+            <h1>Hello, Ada</h1>
+            <div class="sub">Computer Science</div>
+          </div>
+          <div class="band-actions">
+            <a class="round glass" href="#s-notifications" aria-label="Notifications, 3 unread"><i data-icon="bell"></i><span class="badge-num">3</span></a>
+            <a href="#s-profile"><span class="avatar c2" style="border:2px solid rgba(255,255,255,.5)">AD</span></a>
+          </div>
+        </div>
+        <div class="avail">
+          <div class="top"><b>13 free slots a week</b><a href="#s-onboarding">Edit</a></div>
+          <div class="week">
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Mon</span></div>
+            <div class="d"><i class="on"></i><i></i><i class="on"></i><i class="on"></i><span>Tue</span></div>
+            <div class="d"><i></i><i></i><i class="on"></i><i></i><span>Wed</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i class="on"></i><span>Thu</span></div>
+            <div class="d"><i></i><i class="on"></i><i class="on"></i><i></i><span>Fri</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Sat</span></div>
+            <div class="d"><i></i><i></i><i></i><i></i><span>Sun</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="h-section"><h3>Your courses</h3><a href="#s-profile">Edit</a></div>
+        <div class="chips">
+          <span class="chip">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+          <span class="chip">CHM 101</span>
+        </div>
+
+        <div class="h-section"><h3>Your groups</h3><a href="#s-groups">See all</a></div>
+        <a class="feature" href="#s-chat">
+          <span class="code">MTH</span>
+          <span class="kicker">MTH 111 <span class="badge active">Active</span></span>
+          <h2>MTH 111 Squad</h2>
+          <p class="last">Tunde: I'm in. Library at 4?</p>
+          <div class="people">
+            <span class="avatar sm c2">AD</span>
+            <span class="avatar sm c1">NO</span>
+            <span class="avatar sm c3">TE</span>
+            <span class="avatar sm c4">FA</span>
+            <small>5 members · 2 unread</small>
+          </div>
+          <div class="go"><span>Open chat</span><span class="round"><i data-icon="arrow"></i></span></div>
+        </a>
+
+        <div class="stack" style="margin-top:10px">
+          <a class="item" href="#s-group">
+            <span class="tile c2">PHY</span>
+            <div class="item-main">
+              <div class="item-title">PHY 101 Night Owls</div>
+              <div class="item-sub">4 members <span class="dot"></span> Forming</div>
+            </div>
+            <span class="round sm"><i data-icon="chevron-right" class="sm"></i></span>
+          </a>
+          <a class="item" href="#s-groups">
+            <span class="avatar c5">CN</span>
+            <div class="item-main">
+              <div class="item-title">Invitation to CHM 101 Crew</div>
+              <div class="item-sub">From Chidi N.</div>
+            </div>
+            <span class="badge pending">New</span>
+          </a>
+        </div>
+
+        <a class="btn block" href="#s-match" style="margin-top:20px"><i data-icon="zap" class="sm"></i>Find study partners</a>
+      </div>
+
+      <nav class="tabbar" data-active="home"></nav>
+    </div>
+  </div></div>
+  <figcaption><b>Home</b><span>Home. Your week lives in the green band; your most active group is the big card, the rest follow as separate cards.</span></figcaption>
+</figure><figure class="shot" id="s-groups">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div><h1>Groups</h1><div class="sub">3 groups across 3 courses</div></div>
+          <a class="round glass" href="#s-create" aria-label="Create a group"><i data-icon="plus"></i></a>
+        </div>
+        <div class="ways">
+          <a href="#s-discover"><i data-icon="search"></i>Discover open groups</a>
+          <a href="#s-match"><i data-icon="zap"></i>Get matched</a>
+          <a href="#s-create"><i data-icon="plus"></i>Start a group</a>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="h-section"><h3>Invitations</h3><span class="n">1</span></div>
+        <div class="card invite">
+          <div class="top">
+            <span class="avatar c5">CN</span>
+            <div class="item-main">
+              <div class="item-title">CHM 101 Crew</div>
+              <div class="item-sub">From Chidi N. <span class="dot"></span> 3 members</div>
+            </div>
+            <span class="badge pending">Pending</span>
+          </div>
+          <div class="acts">
+            <button class="btn small outline">Decline</button>
+            <button class="btn small">Accept</button>
+          </div>
+        </div>
+
+        <div class="h-section"><h3>Your groups</h3><span class="n">3</span></div>
+        <div class="stack">
+          <a class="item" href="#s-group">
+            <span class="tile c1">MTH</span>
+            <div class="item-main">
+              <div class="item-title">MTH 111 Squad</div>
+              <div class="item-sub">5 members <span class="dot"></span> 2 unread</div>
+            </div>
+            <span class="badge active">Active</span>
+          </a>
+          <a class="item" href="#s-group">
+            <span class="tile c2">PHY</span>
+            <div class="item-main">
+              <div class="item-title">PHY 101 Night Owls</div>
+              <div class="item-sub">4 members</div>
+            </div>
+            <span class="badge forming">Forming</span>
+          </a>
+          <a class="item" href="#s-group">
+            <span class="tile c3">CSC</span>
+            <div class="item-main">
+              <div class="item-title">CSC 121 Underground</div>
+              <div class="item-sub">6 members <span class="dot"></span> quiet for 2 weeks</div>
+            </div>
+            <span class="badge dormant">Dormant</span>
+          </a>
+        </div>
+      </div>
+
+      <nav class="tabbar" data-active="groups"></nav>
+    </div>
+  </div></div>
+  <figcaption><b>Groups</b><span>Groups. Three ways to find a group in the band, invitations you owe an answer, then each group as its own card with a solid status badge.</span></figcaption>
+</figure><figure class="shot" id="s-notifications">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band" style="padding-bottom:36px">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div><h1>Inbox</h1><div class="sub">2 unread</div></div>
+          <div class="band-actions">
+            <a class="btn xs white" href="#">Mark all read</a>
+            <a class="round glass" href="#s-settings" aria-label="Notification settings"><i data-icon="sliders"></i></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="groupline" style="margin-top:0"><b>Today</b></div>
+        <div class="stack">
+          <a class="item n-item unread" href="#s-groups">
+            <span class="tile sm c5"><i data-icon="mail" class="sm"></i></span>
+            <div class="item-main">
+              <div class="item-title">Invitation</div>
+              <p>Chidi invited you to CHM 101 Crew.</p>
+            </div>
+            <div class="item-meta"><time>2m</time><span class="udot"></span></div>
+          </a>
+          <a class="item n-item unread" href="#s-chat">
+            <span class="tile sm c1"><i data-icon="calendar" class="sm"></i></span>
+            <div class="item-main">
+              <div class="item-title">Study time confirmed</div>
+              <p>Thursday 4:00 PM in MTH 111 Squad. Ngozi said yes.</p>
+            </div>
+            <div class="item-meta"><time>1h</time><span class="udot"></span></div>
+          </a>
+          <a class="item n-item" href="#s-chat">
+            <span class="tile sm c3"><i data-icon="file" class="sm"></i></span>
+            <div class="item-main">
+              <div class="item-title">New file</div>
+              <p>Week 5 Notes.pdf in MTH 111 Squad.</p>
+            </div>
+            <div class="item-meta"><time>3h</time></div>
+          </a>
+        </div>
+
+        <div class="groupline"><b>Yesterday</b></div>
+        <div class="stack">
+          <a class="item n-item" href="#s-chat">
+            <span class="tile sm c6"><i data-icon="clock" class="sm"></i></span>
+            <div class="item-main">
+              <div class="item-title">Starting in 30 minutes</div>
+              <p>Study session with MTH 111 Squad.</p>
+            </div>
+            <div class="item-meta"><time>3:30 PM</time></div>
+          </a>
+        </div>
+        <p class="end">You're all caught up.</p>
+      </div>
+
+      <nav class="tabbar" data-active="inbox"></nav>
+    </div>
+  </div></div>
+  <figcaption><b>Inbox</b><span>Inbox. Unread items carry a green edge and dot; each kind has its own tile colour.</span></figcaption>
+</figure><figure class="shot" id="s-profile">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <div class="brand"><span class="mark"><i data-icon="logo" class="sm"></i></span>StudySync</div>
+          <a class="round glass" href="#" aria-label="Edit profile"><i data-icon="edit" class="sm"></i></a>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="who">
+          <span class="avatar xl c2">AD</span>
+          <h2>Ada Dimoko</h2>
+          <span class="badge active"><i data-icon="book" class="xs"></i>Computer Science</span>
+        </div>
+
+        <div class="rows" style="margin-top:22px">
+          <div class="r"><span class="k">Email</span><span class="v">ada.dimoko@ui.edu.ng</span></div>
+          <div class="r"><span class="k">Groups</span><span class="v">3</span></div>
+          <div class="r"><span class="k">Free slots</span><span class="v">13 a week</span></div>
+        </div>
+
+        <div class="h-section"><h3>Courses</h3><a href="#">Add or remove</a></div>
+        <div class="chips" style="flex-wrap:wrap; margin:0; padding:0">
+          <span class="chip">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+          <span class="chip">CHM 101</span>
+        </div>
+
+        <div class="h-section"><h3>Weekly availability</h3><a href="#s-onboarding">Edit</a></div>
+        <div class="card">
+          <div class="week on-light">
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Mon</span></div>
+            <div class="d"><i class="on"></i><i></i><i class="on"></i><i class="on"></i><span>Tue</span></div>
+            <div class="d"><i></i><i></i><i class="on"></i><i></i><span>Wed</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i class="on"></i><span>Thu</span></div>
+            <div class="d"><i></i><i class="on"></i><i class="on"></i><i></i><span>Fri</span></div>
+            <div class="d"><i class="on"></i><i class="on"></i><i></i><i></i><span>Sat</span></div>
+            <div class="d"><i></i><i></i><i></i><i></i><span>Sun</span></div>
+          </div>
+        </div>
+
+        <div class="h-section"><h3>Settings</h3></div>
+        <div class="rows">
+          <a class="r" href="#s-settings"><span class="tile sm c1"><i data-icon="bell" class="sm"></i></span><div class="rt"><b>Notifications</b><span>On, quiet 10 PM to 7 AM</span></div><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#s-login"><span class="tile sm" style="background:var(--danger-soft); color:var(--danger)"><i data-icon="log-out" class="sm"></i></span><div class="rt"><b style="color:var(--danger)">Sign out</b></div></a>
+        </div>
+      </div>
+
+      <nav class="tabbar" data-active="profile"></nav>
+    </div>
+  </div></div>
+  <figcaption><b>Profile</b><span>Profile. Large avatar over the green band, a solid department badge, details as label and value rows.</span></figcaption>
+</figure></div>
+</section><section class="group">
+  <header><h2>Groups</h2><p>Finding, creating and using a study group.</p></header>
+  <div class="shots"><figure class="shot" id="s-discover">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="#s-groups" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="t"><b>Discover</b><span>Open groups in your courses</span></div>
+        <span></span>
+      </div>
+
+      <div class="sheet plain">
+        <div class="chips">
+          <span class="chip">All</span>
+          <span class="chip on">MTH 111</span>
+          <span class="chip">PHY 101</span>
+          <span class="chip">CSC 121</span>
+        </div>
+
+        <div class="rows" style="margin-top:16px">
+          <div class="r"><div class="rt"><b>Open groups only</b><span>Hide groups that need approval</span></div><span class="switch off"><i></i></span></div>
+        </div>
+
+        <div class="h-section"><h3>3 groups in MTH 111</h3></div>
+        <div class="stack">
+          <div class="item g">
+            <div class="top">
+              <span class="tile c1">CAL</span>
+              <div class="item-main"><div class="item-title">Calculus Crew</div><div class="item-sub">4 of 5 seats taken <span class="dot"></span> Open</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div>
+              <button class="btn small">Join</button>
+            </div>
+          </div>
+          <div class="item g">
+            <div class="top">
+              <span class="tile c5">GRC</span>
+              <div class="item-main"><div class="item-title">Grace &amp; Co</div><div class="item-sub">3 of 6 seats taken <span class="dot"></span> Approval</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+              <button class="btn small outline">Ask</button>
+            </div>
+          </div>
+          <div class="item g">
+            <div class="top">
+              <span class="tile c3">TUT</span>
+              <div class="item-main"><div class="item-title">Tuesday Tutors</div><div class="item-sub">5 of 5 seats taken</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+              <button class="btn small" disabled>Full</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:16px"><i data-icon="info" class="sm"></i><span>Open groups add you right away. The rest send a request to the group admin.</span></div>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Discover</b><span>Discover. Black chip for the course you're browsing, seats shown as a small bar so full groups read at a glance.</span></figcaption>
+</figure><figure class="shot" id="s-match">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="#s-groups" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="t"><b>Get matched</b><span>By shared free time</span></div>
+        <span></span>
+      </div>
+
+      <div class="sheet plain">
+        <div class="ptabs"><span class="on">MTH 111</span><span>PHY 101</span><span>CSC 121</span></div>
+
+        <div class="h-section"><h3>Best match</h3></div>
+        <div class="top-match">
+          <span class="pct">92%</span>
+          <div class="k">92% match</div>
+          <h2>MTH 111 Squad</h2>
+          <p>4 members · free together 4 times a week</p>
+          <div class="go"><button class="btn white">Ask to join</button></div>
+        </div>
+
+        <div class="stack" style="margin-top:10px">
+          <div class="item">
+            <span class="tile c5">EVE</span>
+            <div class="item-main"><div class="item-title">Evening Set</div><div class="item-sub">3 members <span class="dot"></span> 3 shared slots</div></div>
+            <span class="score">74%</span>
+          </div>
+        </div>
+
+        <div class="h-section"><h3>Start a group with</h3></div>
+        <div class="stack">
+          <div class="item p">
+            <div class="top">
+              <span class="avatar c5">CN</span>
+              <div class="item-main"><div class="item-title">Chidi N.</div><div class="item-sub">Computer Science <span class="dot"></span> 4 shared</div></div>
+              <span class="score">88%</span>
+            </div>
+            <button class="btn small outline block"><i data-icon="user-plus" class="sm"></i>Start a group together</button>
+          </div>
+          <div class="item p">
+            <div class="top">
+              <span class="avatar c4">FA</span>
+              <div class="item-main"><div class="item-title">Fola A.</div><div class="item-sub">Statistics <span class="dot"></span> 3 shared</div></div>
+              <span class="score">81%</span>
+            </div>
+            <button class="btn small outline block"><i data-icon="user-plus" class="sm"></i>Start a group together</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Get matched</b><span>Get matched. Pill tabs per course, the best group as a green feature card, partners below with their score.</span></figcaption>
+</figure><figure class="shot" id="s-create">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="#s-groups" aria-label="Close"><i data-icon="x"></i></a>
+        <div class="t"><b>New group</b><span>Takes a minute</span></div>
+        <span></span>
+      </div>
+
+      <div class="sheet plain" style="padding-bottom:110px">
+        <div class="fieldwrap" style="margin-top:4px">
+          <label class="flabel">Group name</label>
+          <div class="field focus">MTH 111 Squad</div>
+          <p class="hint">Members see this in their group list.</p>
+        </div>
+
+        <div class="h-section"><h3>Course</h3></div>
+        <div class="stack">
+          <div class="item course on"><span class="tile sm c1">MTH</span><div class="item-main"><div class="item-title">MTH 111</div><div class="item-sub">Elementary Mathematics I</div></div><span class="radio on"></span></div>
+          <div class="item course"><span class="tile sm c2">PHY</span><div class="item-main"><div class="item-title">PHY 101</div><div class="item-sub">General Physics I</div></div><span class="radio"></span></div>
+          <div class="item course"><span class="tile sm c3">CSC</span><div class="item-main"><div class="item-title">CSC 121</div><div class="item-sub">Introduction to Programming</div></div><span class="radio"></span></div>
+        </div>
+
+        <div class="h-section"><h3>Who can join</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>Anyone can join</b><span>Off means you approve each request</span></div><span class="switch off"><i></i></span></div>
+        </div>
+
+        <div class="note" style="margin-top:16px"><i data-icon="info" class="sm"></i><span>Works offline. The group is created as soon as you're back online.</span></div>
+      </div>
+
+      <div class="dock"><button class="btn">Create group</button></div>
+    </div>
+  </div></div>
+  <figcaption><b>New group</b><span>New group. Big soft fields, the chosen course outlined in ink, Create floating at the bottom.</span></figcaption>
+</figure><figure class="shot" id="s-group">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="band">
+        <div class="statusbar light"></div>
+        <div class="band-row">
+          <a class="round glass" href="#s-groups" aria-label="Back"><i data-icon="chevron-left"></i></a>
+          <a class="round glass" href="#" aria-label="More"><i data-icon="more"></i></a>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="gid">
+          <span class="tile c1">MTH</span>
+          <h2>MTH 111 Squad</h2>
+          <div class="meta">MTH 111 <span class="dot"></span> 5 members <span class="badge active">Active</span></div>
+        </div>
+
+        <div class="quick">
+          <a href="#s-chat"><i data-icon="message"></i>Chat</a>
+          <a href="#"><i data-icon="folder"></i>Files</a>
+          <a href="#"><i data-icon="user-plus"></i>Invite</a>
+        </div>
+
+        <div class="h-section"><h3>When you can all meet</h3></div>
+        <div class="stack">
+          <div class="item slot"><span class="day"><small>Thu</small><b>2–5</b></span><div class="item-main"><div class="item-title">Thursday afternoon</div><div class="item-sub">All 5 of you are free</div></div></div>
+          <div class="item slot"><span class="day"><small>Sat</small><b>8–11</b></span><div class="item-main"><div class="item-title">Saturday morning</div><div class="item-sub">All 5 of you are free</div></div></div>
+        </div>
+
+        <div class="h-section"><h3>Join requests</h3><span class="n">1</span></div>
+        <div class="card req">
+          <div style="display:flex; align-items:center; gap:12px">
+            <span class="avatar c4">FA</span>
+            <div class="item-main"><div class="item-title">Fola A.</div><div class="item-sub">Statistics <span class="dot"></span> 3 shared slots</div></div>
+            <span class="badge pending">Pending</span>
+          </div>
+          <div class="acts"><button class="btn small outline">Decline</button><button class="btn small">Approve</button></div>
+        </div>
+
+        <div class="h-section"><h3>Members</h3><a href="#">Invite</a></div>
+        <div class="stack">
+          <div class="item"><span class="avatar c2">AD</span><div class="item-main"><div class="item-title">Ada Dimoko</div><div class="item-sub">You</div></div><span class="badge soft">Admin</span></div>
+          <div class="item"><span class="avatar c1">NO</span><div class="item-main"><div class="item-title">Ngozi O.</div><div class="item-sub">4 shared slots</div></div></div>
+          <div class="item"><span class="avatar c3">TE</span><div class="item-main"><div class="item-title">Tunde E.</div><div class="item-sub">3 shared slots</div></div></div>
+        </div>
+
+        <div class="h-section"><h3>Manage</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>Discoverable</b><span>Show in Discover for MTH 111</span></div><span class="switch"><i></i></span></div>
+          <a class="r" href="#"><div class="rt"><b>Rename group</b></div><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#"><div class="rt"><b>Archive group</b><span>Admins only</span></div><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#"><div class="rt"><b style="color:var(--danger)">Leave group</b></div></a>
+        </div>
+      </div>
+
+      <div class="dock"><a class="btn" href="#s-chat"><i data-icon="message" class="sm"></i>Open chat</a></div>
+    </div>
+  </div></div>
+  <figcaption><b>Group detail</b><span>Group detail. The group's tile sits over the green band like a profile photo; Open chat floats at the bottom.</span></figcaption>
+</figure><figure class="shot" id="s-chat">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="chead">
+        <a class="round" href="#s-group" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <a class="who" href="#s-group">
+          <span class="tile sm c1">MTH</span>
+          <div style="min-width:0"><b>MTH 111 Squad</b><span><i></i>5 members</span></div>
+        </a>
+        <a class="round" href="#" aria-label="Files"><i data-icon="folder"></i></a>
+      </div>
+
+      <div class="body">
+        <span class="day">Today</span>
+
+        <div class="msg them">
+          <span class="avatar xs c1">NO</span>
+          <div><div class="name">Ngozi <time>10:12</time></div><div class="bubble">Has anyone started the week 5 problems?</div></div>
+        </div>
+        <div class="msg me"><div class="bubble">I did the first three. Want to compare answers before Friday?</div></div>
+        <div class="msg them">
+          <span class="avatar xs c3">TE</span>
+          <div><div class="name">Tunde <time>10:20</time></div><div class="bubble">I'm in. Library at 4?</div></div>
+        </div>
+
+        <div class="session">
+          <div class="top"><span class="kind"><i data-icon="calendar" class="sm"></i>Study time</span><span class="badge waiting">Needs 1 more yes</span></div>
+          <div class="time">Thursday, 4:00 PM</div>
+          <div class="sub">90 min · proposed by Ngozi</div>
+          <div class="people">
+            <span class="avatar sm c2">AD</span><span class="avatar sm c1">NO</span><span class="avatar sm c3">TE</span>
+            <small>2 of 5 said yes</small>
+          </div>
+          <div class="acts"><button class="btn small glass">Can't make it</button><button class="btn small white">I'm in</button></div>
+        </div>
+
+        <div class="msg them">
+          <span class="avatar xs c1">NO</span>
+          <div><div class="name">Ngozi <time>10:31</time></div>
+            <div class="file">
+              <span class="tile sm c4"><i data-icon="file" class="sm"></i></span>
+              <div style="flex:1; min-width:0"><b>Week 5 Notes.pdf</b><span>PDF · 2.1 MB</span></div>
+              <a class="round sm" href="#" aria-label="Save"><i data-icon="download" class="sm"></i></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="msg me pending">
+          <div class="bubble">Bringing the past questions too.</div>
+          <span class="state"><i data-icon="clock" class="xs"></i>Sends when you're back online</span>
+        </div>
+      </div>
+
+      <div class="composer">
+        <a class="round" href="#" aria-label="Attach a file or propose a time" style="background:var(--surface-2); box-shadow:none"><i data-icon="plus"></i></a>
+        <div class="field ph">Message</div>
+        <button class="round dark" aria-label="Send"><i data-icon="send" class="sm"></i></button>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Group chat</b><span>Group chat. Your messages in ink, a proposed study time as a green card, a faded bubble waiting to send offline.</span></figcaption>
+</figure></div>
+</section><section class="group">
+  <header><h2>Settings</h2><p>Pushed from Profile.</p></header>
+  <div class="shots"><figure class="shot" id="s-settings">
+  <div class="frame"><div class="phone">
+    <div class="screen">
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="#s-profile" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="t"><b>Notifications</b></div>
+        <span></span>
+      </div>
+
+      <div class="sheet plain">
+        <div class="master">
+          <span class="round glass"><i data-icon="bell"></i></span>
+          <div style="flex:1"><b>Notifications from StudySync</b><span>Off silences everything below</span></div>
+          <span class="switch"><i></i></span>
+        </div>
+
+        <div class="h-section"><h3>How much, and when</h3></div>
+        <div class="label" style="margin:0 4px 8px">At most, per day</div>
+        <div class="ptabs"><span>5</span><span class="on">10</span><span>20</span><span>No limit</span></div>
+        <div class="rows" style="margin-top:10px">
+          <div class="r"><div class="rt"><b>Quiet hours</b></div><span class="switch"><i></i></span></div>
+          <a class="r" href="#"><span class="k">From</span><span class="val">10:00 PM</span><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+          <a class="r" href="#"><span class="k">Until</span><span class="val">7:00 AM</span><i data-icon="chevron-right" class="sm" style="color:var(--text-4)"></i></a>
+        </div>
+
+        <div class="h-section"><h3>What to tell you about</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>New messages</b><span>One summary per group</span></div><span class="switch"><i></i></span></div>
+          <div class="r"><div class="rt"><b>Shared files</b><span>When someone adds a file</span></div><span class="switch"><i></i></span></div>
+          <div class="r"><div class="rt"><b>Study times</b><span>Proposed, confirmed, cancelled</span></div><span class="switch"><i></i></span></div>
+          <div class="r"><div class="rt"><b>Group invitations</b><span>When someone invites you</span></div><span class="switch"><i></i></span></div>
+        </div>
+
+        <div class="h-section"><h3>Nudges</h3></div>
+        <div class="rows">
+          <div class="r"><div class="rt"><b>One more yes</b><span>A study time needs one more yes</span></div><span class="switch"><i></i></span></div>
+          <div class="r"><div class="rt"><b>When your group is all free</b><span>At most once a week</span></div><span class="switch"><i></i></span></div>
+          <div class="r"><div class="rt"><b>When a group goes quiet</b><span>At most once a fortnight</span></div><span class="switch off"><i></i></span></div>
+          <div class="r"><div class="rt"><b>Invitations you have not answered</b><span>One reminder per invitation</span></div><span class="switch"><i></i></span></div>
+        </div>
+        <p class="foot">Session reminders 30 minutes before a study time always come through.</p>
+      </div>
+    </div>
+  </div></div>
+  <figcaption><b>Notification settings</b><span>Notification settings. The master switch as a green card; the rest grouped in white cards.</span></figcaption>
+</figure></div>
+</section>
+</div>
+<script>
+/* Shared pieces for the preview pages: Feather icons, the status bar and
+   the tab bar. Mockup-only; the app gets these from @expo/vector-icons and
+   expo-router's Tabs. Use <i data-icon="name" class="sm"></i> anywhere. */
+
+const ICONS = {
+  home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  'chevron-right': '<polyline points="9 18 15 12 9 6"/>',
+  'chevron-left': '<polyline points="15 18 9 12 15 6"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  paperclip: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  'user-plus': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>',
+  message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  logo: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  'log-in': '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  arrow: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  'chevron-down': '<polyline points="6 9 12 15 18 9"/>',
+  'chevron-up': '<polyline points="18 15 12 9 6 15"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+  'arrow-up-right': '<line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>',
+  sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  slash: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
+};
+
+function svg(name, cls) {
+  return `<svg class="ic ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+document.querySelectorAll('i[data-icon]').forEach((el) => {
+  el.outerHTML = svg(el.dataset.icon, el.className);
+});
+
+document.querySelectorAll('.statusbar').forEach((el) => {
+  el.innerHTML = '<span>9:41</span><span style="display:flex;align-items:center"><span class="sig"><i></i><i></i><i></i></span><span class="batt"></span></span>';
+});
+
+const TABS = [
+  ['home', 'Home', 'home', '#s-home'],
+  ['groups', 'Groups', 'users', '#s-groups'],
+  ['inbox', 'Inbox', 'bell', '#s-notifications'],
+  ['profile', 'Profile', 'user', '#s-profile'],
+];
+
+document.querySelectorAll('nav.tabbar').forEach((el) => {
+  const active = el.dataset.active;
+  el.setAttribute('aria-label', 'Tabs');
+  el.innerHTML = TABS.map(([key, label, icon, href]) =>
+    `<a class="tab${key === active ? ' active' : ''}" href="${href}" aria-label="${label}">` +
+    (key === 'inbox' && key !== active ? '<span class="tabbadge">3</span>' : '') +
+    svg(icon, 'lg') + `<span class="sr">${label}</span></a>`
+  ).join('');
+});
+
+</script>

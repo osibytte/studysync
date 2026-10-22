@@ -142,28 +142,34 @@ const styles = StyleSheet.create({
   dayHeaderTextActive: { color: colors.primaryDark },
   cell: {
     flex: 1,
-    height: 40,
+    height: 46,
     marginHorizontal: 2,
     borderRadius: radius.sm + 2,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: colors.surfaceAlt,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Selected = lime with an ink check, same pair as the primary button.
-  cellActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  cellMark: { color: colors.text, fontSize: fontSize.sm, fontFamily: FONT.bold },
+  // Selected = brand green with a white check: free time reads as green
+  // everywhere it appears (the home band, the profile week strip).
+  cellActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  cellMark: { color: colors.textInverse, fontSize: fontSize.sm, fontFamily: FONT.bold },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  summary: { flex: 1, fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted },
+  summary: { flex: 1, fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.text },
   clearButton: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  clearText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.primaryDark },
+  clearText: {
+    fontSize: fontSize.sm,
+    fontFamily: FONT.semi,
+    color: colors.text,
+    textDecorationLine: 'underline',
+  },
 });

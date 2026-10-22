@@ -1,14 +1,20 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { NotificationCard } from '@/components/NotificationCard';
-import { Screen } from '@/components/Screen';
+import {
+  BandHeader,
+  SheetCap,
+  bandListStyles,
+  useBandStatusBar,
+} from '@/components/BandScreen';
+import { RoundButton } from '@/components/RoundButton';
 import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { notificationRoute, type InboxItem } from '@/lib/notificationRules';
-import { FONT, colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, shadowCard, spacing, typography } from '@/theme';
 
 /**
  * The in-app inbox — what StudySync has told this student, newest first.
@@ -36,6 +42,7 @@ export default function NotificationsScreen() {
   const { profile } = useAuth();
   const { isOnline } = useNetwork();
   const router = useRouter();
+  useBandStatusBar();
 
   const userId = profile?.user_id ?? null;
   const {
@@ -103,13 +110,16 @@ export default function NotificationsScreen() {
     ({ item }: { item: InboxItem }) => {
       if (item.type === 'day') {
         return (
-          <Text style={styles.dayHeader} accessibilityRole="header">
-            {item.label}
-          </Text>
+          <View style={bandListStyles.row}>
+            <Text style={styles.dayHeader} accessibilityRole="header">
+              {item.label}
+            </Text>
+          </View>
         );
       }
       const route = notificationRoute(item.row);
       return (
+        <View style={bandListStyles.row}>
         <NotificationCard
           row={item.row}
           onPress={route ? () => handlePress(route, item.row.notification_id) : null}
@@ -122,6 +132,7 @@ export default function NotificationsScreen() {
             isOnline ? null : 'Dismissing needs a connection.'
           }
         />
+        </View>
       );
     },
     [handlePress, handleDismiss, isOnline]
@@ -129,120 +140,167 @@ export default function NotificationsScreen() {
 
   const empty = items.length === 0;
 
-  return (
-    <Screen
-      title="Notifications"
-      subtitle={
-        unread > 0
-          ? `${unread} you have not read yet.`
-          : 'Everything StudySync has told you.'
-      }
-      scroll={false}
-      footer={
-        <View>
-          {unread > 0 && (
-            <Button
-              label={`Mark all ${unread} as read`}
-              variant="secondary"
-              onPress={() => void handleClearAll()}
-              loading={clearing}
-              disabled={clearing || !isOnline}
+  const header = (
+    <>
+      <BandHeader
+        title="Inbox"
+        subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
+        right={
+          <View style={styles.headActions}>
+            {unread > 0 && (
+              <Pressable
+                onPress={() => void handleClearAll()}
+                disabled={clearing || !isOnline}
+                accessibilityRole="button"
+                accessibilityLabel={`Mark all ${unread} as read`}
+                accessibilityHint={isOnline ? undefined : 'Needs a connection'}
+                accessibilityState={{ disabled: clearing || !isOnline, busy: clearing }}
+                style={({ pressed }) => [
+                  styles.markAll,
+                  (clearing || !isOnline) && styles.markAllDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {clearing ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Text style={styles.markAllText}>Mark all read</Text>
+                )}
+              </Pressable>
+            )}
+            <RoundButton
+              icon="sliders"
+              label="Notification settings"
+              tone="glass"
+              onPress={() => router.push('/(app)/notification-settings')}
             />
-          )}
-          <Button
-            label="Notification settings"
-            variant="ghost"
-            onPress={() => router.push('/(app)/notification-settings')}
-            style={unread > 0 ? styles.footerSecond : undefined}
-          />
-          {/* No back button: this is a tab, the bar below is the way out. */}
-        </View>
-      }
-    >
-      {!isOnline && (
-        <Text style={styles.note}>
-          You are offline, so this is the last list fetched. You can read these, but
-          dismissing one needs a connection.
-        </Text>
-      )}
-      {!!actionError && (
-        <Text style={styles.error} accessibilityLiveRegion="polite">
-          {actionError}
-        </Text>
-      )}
+          </View>
+        }
+      />
+      <SheetCap />
+      <View style={bandListStyles.row}>
+        {!isOnline && (
+          <Text style={styles.note}>
+            You are offline, so this is the last list fetched. You can read these, but
+            dismissing one needs a connection.
+          </Text>
+        )}
+        {!!actionError && (
+          <Text style={styles.error} accessibilityLiveRegion="polite">
+            {actionError}
+          </Text>
+        )}
+      </View>
+    </>
+  );
 
-      {loading && empty ? (
-        <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
-      ) : error && empty ? (
-        <View>
-          <Text style={styles.error}>{error}</Text>
-          <Button label="Try again" variant="secondary" onPress={() => void reload()} />
-        </View>
-      ) : empty ? (
-        <Text style={styles.emptyText}>
-          Nothing yet. This is where a confirmed study time, a shared file, a group
-          invitation or a message summary lands — and it stays here even if your phone
-          was off or a notification was withheld to keep to your daily limit.
-        </Text>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.key}
-          renderItem={renderItem}
-          // The keyset page, fetched as the student reaches the end. 0.4 rather
-          // than the default 2: this list holds day headers as well as rows, so a
-          // "two screens from the end" threshold fires almost immediately.
-          onEndReached={() => void loadOlder()}
-          onEndReachedThreshold={0.4}
-          refreshing={loading && !empty}
-          onRefresh={() => void reload()}
-          ListFooterComponent={
-            loadingMore ? (
+  return (
+    <View style={bandListStyles.root}>
+      <FlatList
+        data={empty ? [] : items}
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          <View style={bandListStyles.row}>
+            {loading ? (
               <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
-            ) : !hasMore && items.length > 6 ? (
-              <Text style={styles.endNote}>That is everything.</Text>
-            ) : null
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </Screen>
+            ) : error ? (
+              <View>
+                <Text style={styles.error}>{error}</Text>
+                <Button label="Try again" variant="secondary" onPress={() => void reload()} />
+              </View>
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Nothing yet</Text>
+                <Text style={styles.emptyText}>
+                  This is where a confirmed study time, a shared file, a group invitation
+                  or a message summary lands — and it stays here even if your phone was
+                  off or a notification was withheld to keep to your daily limit.
+                </Text>
+              </View>
+            )}
+          </View>
+        }
+        // The keyset page, fetched as the student reaches the end. 0.4 rather
+        // than the default 2: this list holds day headers as well as rows, so a
+        // "two screens from the end" threshold fires almost immediately.
+        onEndReached={() => void loadOlder()}
+        onEndReachedThreshold={0.4}
+        refreshing={loading && !empty}
+        onRefresh={() => void reload()}
+        progressViewOffset={0}
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
+          ) : !hasMore && items.length > 0 ? (
+            <Text style={styles.endNote}>You're all caught up.</Text>
+          ) : null
+        }
+        style={styles.flex}
+        contentContainerStyle={bandListStyles.content}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  headActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  markAll: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md + 2,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markAllDisabled: { opacity: 0.5 },
+  markAllText: { fontSize: fontSize.sm - 1, fontFamily: FONT.semi, color: colors.text },
+  pressed: { opacity: 0.8 },
   note: {
     fontSize: fontSize.xs,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
     lineHeight: 18,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   error: {
     fontSize: fontSize.sm,
+    fontFamily: FONT.regular,
     color: colors.danger,
     lineHeight: 20,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   loader: { marginVertical: spacing.lg },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: spacing.lg + 2,
+    gap: spacing.sm,
+    ...shadowCard,
+  },
+  emptyTitle: { ...typography.section },
   emptyText: {
     fontSize: fontSize.sm,
-    color: colors.textMuted,
-    lineHeight: 20,
-    marginTop: spacing.md,
+    fontFamily: FONT.regular,
+    color: colors.textSecondary,
+    lineHeight: 21,
   },
   dayHeader: {
-    fontSize: fontSize.xs,
-    fontFamily: FONT.bold,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+    fontSize: fontSize.md,
+    fontFamily: FONT.semi,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm + 2,
+    marginLeft: spacing.xs,
   },
   endNote: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm - 1,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
     textAlign: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.xl,
   },
-  footerSecond: { marginTop: spacing.sm },
 });

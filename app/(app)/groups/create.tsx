@@ -157,23 +157,17 @@ export default function CreateGroupScreen() {
 
   return (
     <Screen
-      title="Create a group"
+      title="New group"
       subtitle="You become its creator, and can invite people or approve requests to join."
+      onBack={() => router.back()}
+      backIcon="close"
       footer={
-        <View>
-          <Button
-            label="Create group"
-            onPress={() => void handleCreate()}
-            loading={saving}
-            disabled={!canCreate}
-          />
-          <Button
-            label="Cancel"
-            variant="ghost"
-            onPress={() => router.back()}
-            style={styles.cancel}
-          />
-        </View>
+        <Button
+          label="Create group"
+          onPress={() => void handleCreate()}
+          loading={saving}
+          disabled={!canCreate}
+        />
       }
     >
       <Text style={styles.label}>Course</Text>
@@ -231,7 +225,7 @@ export default function CreateGroupScreen() {
           value={discoverable}
           onValueChange={setDiscoverable}
           disabled={saving}
-          trackColor={{ true: colors.accent, false: colors.border }}
+          trackColor={{ true: colors.primary, false: colors.borderStrong }}
           accessibilityLabel="Show this group on browse"
         />
       </View>

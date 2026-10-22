@@ -282,13 +282,15 @@ const styles = StyleSheet.create({
   card: {
     marginTop: spacing.md,
     padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: radius.xl - 4,
+    borderWidth: 1.5,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
-  cardConfirmed: { borderColor: colors.success, backgroundColor: colors.background },
-  cardCancelled: { backgroundColor: colors.surfaceAlt },
+  // A study time is the group's plan, so it is the one green card in the chat;
+  // confirmed gets a stronger edge, cancelled drops back to grey.
+  cardConfirmed: { borderColor: colors.success },
+  cardCancelled: { backgroundColor: colors.surfaceAlt, borderColor: colors.surfaceAlt },
 
   headerRow: {
     flexDirection: 'row',
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: fontSize.xs,
     fontFamily: FONT.bold,
-    color: colors.textMuted,
+    color: colors.primaryDark,
     letterSpacing: 0.5,
   },
   status: { fontSize: fontSize.xs, fontFamily: FONT.bold, color: colors.warning },
@@ -306,12 +308,13 @@ const styles = StyleSheet.create({
   statusCancelled: { color: colors.textMuted },
 
   when: {
-    fontSize: fontSize.md,
-    fontFamily: FONT.bold,
+    fontSize: fontSize.lg + 1,
+    fontFamily: FONT.extra,
+    letterSpacing: -0.1,
     color: colors.text,
     marginTop: spacing.sm,
   },
-  detail: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
+  detail: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textSecondary, marginTop: 2 },
   tally: {
     fontSize: fontSize.sm,
     fontFamily: FONT.semi,
@@ -323,18 +326,18 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: MIN_TOUCH,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  answerActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  answerActive: { borderColor: colors.accent, backgroundColor: colors.accent },
   answerDisabled: { opacity: 0.5 },
   answerPressed: { opacity: 0.7 },
-  answerText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textMuted },
-  answerTextActive: { color: colors.text },
+  answerText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  answerTextActive: { color: colors.textInverse },
 
   note: {
     fontSize: fontSize.xs,
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
   attendees: {
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: 'rgba(28,100,64,0.15)',
   },
   attendeeRow: {
     flexDirection: 'row',
@@ -386,9 +389,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   cancelConfirmText: { fontSize: fontSize.xs, color: colors.text, lineHeight: 18 },
   cancelRow: { flexDirection: 'row', marginTop: spacing.sm, gap: spacing.sm },

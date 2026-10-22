@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AvailabilityGrid } from '@/components/AvailabilityGrid';
 import { Button } from '@/components/Button';
-import { Screen } from '@/components/Screen';
+import { BandScreen } from '@/components/BandScreen';
+import { Initials, initialsOf } from '@/components/Initials';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/context/AuthContext';
 import { useNetwork } from '@/context/NetworkContext';
@@ -18,7 +20,7 @@ import {
 import { enqueue } from '@/lib/outbox';
 import { friendlyError, supabase } from '@/lib/supabase';
 import { validateDepartment, validateFullName } from '@/lib/validation';
-import { FONT, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, shadowCard, spacing, typography } from '@/theme';
 
 /**
  * Profile editing — name, department, availability, and a route to course
@@ -129,20 +131,29 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen
-      title="Your profile"
-      footer={
-        <View>
-          <Button
-            label="Save changes"
-            onPress={() => void handleSave()}
-            loading={saving}
-            disabled={saving}
-          />
-          {/* No back button: this is a tab, the bar below is the way out. */}
-        </View>
-      }
-    >
+    <BandScreen title="Profile" bandExtra={44} sheetStyle={styles.sheet}>
+      <View style={styles.who}>
+        <Initials
+          text={initialsOf(profile?.full_name)}
+          colorKey={profile?.user_id}
+          size={96}
+          shape="circle"
+          ring
+        />
+        <Text style={styles.name} accessibilityRole="header" numberOfLines={2}>
+          {profile?.full_name || 'Your profile'}
+        </Text>
+        {!!profile?.department && (
+          <View style={styles.deptBadge}>
+            <Feather name="book-open" size={13} color={colors.textInverse} />
+            <Text style={styles.deptText}>{profile.department}</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.sectionHeader} accessibilityRole="header">
+        Details
+      </Text>
       <TextField
         label="Full name"
         value={fullName}
@@ -160,35 +171,42 @@ export default function ProfileScreen() {
         editable={!saving}
       />
 
-      <Text style={styles.sectionHeader}>Courses</Text>
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionHeaderInline} accessibilityRole="header">
+          Courses
+        </Text>
+        <Pressable
+          onPress={() => router.push('/(app)/courses')}
+          accessibilityRole="button"
+          accessibilityLabel="Add or remove courses"
+          hitSlop={12}
+        >
+          <Text style={styles.link}>Add or remove</Text>
+        </Pressable>
+      </View>
       {userCourses.length === 0 ? (
         <Text style={styles.emptyText}>No courses yet.</Text>
       ) : (
-        userCourses.map((uc) => (
-          <View
-            key={uc.user_course_id}
-            style={styles.courseRow}
-            accessibilityLabel={`${uc.course?.course_code}, ${uc.course?.course_title}`}
-          >
-            <View style={styles.courseTextCol}>
-              <Text style={styles.courseCode}>{uc.course?.course_code}</Text>
-              <Text style={styles.courseTitle} numberOfLines={1}>
-                {uc.course?.course_title}
-              </Text>
+        <View style={styles.chips}>
+          {userCourses.map((uc) => (
+            <View
+              key={uc.user_course_id}
+              style={styles.chip}
+              accessible
+              accessibilityLabel={`${uc.course?.course_code}, ${uc.course?.course_title}`}
+            >
+              <Text style={styles.chipText}>{uc.course?.course_code}</Text>
             </View>
-          </View>
-        ))
+          ))}
+        </View>
       )}
 
-      <Button
-        label="Add or remove courses"
-        variant="secondary"
-        onPress={() => router.push('/(app)/courses')}
-        style={styles.manageCourses}
-      />
-
-      <Text style={styles.sectionHeader}>Weekly availability</Text>
-      <AvailabilityGrid grid={grid} onChange={setGrid} />
+      <Text style={styles.sectionHeader} accessibilityRole="header">
+        Weekly availability
+      </Text>
+      <View style={styles.card}>
+        <AvailabilityGrid grid={grid} onChange={setGrid} />
+      </View>
 
       {!!formError && (
         <Text style={styles.formError} accessibilityLiveRegion="polite">
@@ -200,48 +218,111 @@ export default function ProfileScreen() {
           {status}
         </Text>
       )}
-
-      <Text style={styles.sectionHeader}>Notifications</Text>
+      {/*
+        Inline rather than pinned: a pinned bar would sit under the floating tab
+        bar. It follows the last thing you can edit.
+      */}
       <Button
-        label="Notification settings"
-        variant="secondary"
-        onPress={() => router.push('/(app)/notification-settings')}
+        label="Save changes"
+        onPress={() => void handleSave()}
+        loading={saving}
+        disabled={saving}
+        style={styles.save}
       />
 
-      <Button
-        label="Sign out"
-        variant="ghost"
-        onPress={() => void signOut()}
-        style={styles.signOut}
-      />
-    </Screen>
+      <Text style={styles.sectionHeader} accessibilityRole="header">
+        Settings
+      </Text>
+      <View style={styles.rows}>
+        <Pressable
+          onPress={() => router.push('/(app)/notification-settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Notification settings"
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        >
+          <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+            <Feather name="bell" size={17} color={colors.primaryDark} />
+          </View>
+          <Text style={styles.rowText}>Notifications</Text>
+          <Feather name="chevron-right" size={18} color={colors.textMuted} />
+        </Pressable>
+        <View style={styles.rowRule} />
+        <Pressable
+          onPress={() => void signOut()}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        >
+          <View style={[styles.rowIcon, { backgroundColor: colors.dangerSoft }]}>
+            <Feather name="log-out" size={17} color={colors.danger} />
+          </View>
+          <Text style={[styles.rowText, { color: colors.danger }]}>Sign out</Text>
+        </Pressable>
+      </View>
+    </BandScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionHeader: {
-    fontSize: fontSize.md,
-    fontFamily: FONT.bold,
-    color: colors.text,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
+  sheet: { paddingTop: 0 },
+  // Pulled up over the band, like a profile photo on a cover.
+  who: { alignItems: 'center', marginTop: -64, marginBottom: spacing.sm },
+  name: {
+    ...typography.title,
+    fontFamily: FONT.extra,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
-  emptyText: { fontSize: fontSize.sm, color: colors.textMuted },
-  courseRow: {
+  deptBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
+    gap: 6,
+    marginTop: spacing.sm + 2,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.success,
   },
-  courseTextCol: { flex: 1 },
-  courseCode: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
-  courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: 2 },
-  manageCourses: { marginTop: spacing.sm },
-  formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md },
-  status: { color: colors.success, fontSize: fontSize.sm, marginTop: spacing.md },
+  deptText: { fontSize: fontSize.sm - 1, fontFamily: FONT.semi, color: colors.textInverse },
 
-  signOut: { marginTop: spacing.xxl },
+  sectionHeader: { ...typography.section, marginTop: spacing.xl + 2, marginBottom: spacing.md, paddingHorizontal: 2 },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    paddingHorizontal: 2,
+  },
+  sectionHeaderInline: { ...typography.section },
+  link: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text, textDecorationLine: 'underline' },
+  emptyText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted },
+
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    ...shadowCard,
+  },
+  chipText: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textSecondary },
+
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, ...shadowCard },
+  formError: { color: colors.danger, fontFamily: FONT.regular, fontSize: fontSize.sm, marginTop: spacing.md },
+  status: { color: colors.success, fontFamily: FONT.semi, fontSize: fontSize.sm, marginTop: spacing.md },
+  save: { marginTop: spacing.lg },
+
+  rows: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    ...shadowCard,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60 },
+  rowPressed: { opacity: 0.7 },
+  rowRule: { height: 1, backgroundColor: colors.border },
+  rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.text },
 });

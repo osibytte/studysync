@@ -3,104 +3,74 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Match · StudySync preview</title>
+<title>Get matched · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .matchpill {
-    background: var(--primary-soft); color: var(--primary-dark);
-    border-radius: 999px; padding: 4px 11px;
-    font-size: 12px; font-weight: 700; white-space: nowrap;
-  }
-  .sugg { display: flex; align-items: center; gap: 12px; }
+  .top-match { position: relative; overflow: hidden; border-radius: 28px; padding: 20px; color: #fff; background: linear-gradient(160deg, var(--green-700), var(--green-900)); box-shadow: var(--shadow-float); }
+  .top-match .pct { position: absolute; right: 18px; top: 14px; font-size: 64px; font-weight: 800; letter-spacing: -0.05em; color: rgba(255,255,255,.14); }
+  .top-match .k { font-size: 13px; font-weight: 600; color: #A6E3B8; }
+  .top-match h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; }
+  .top-match p { font-size: 14px; color: rgba(255,255,255,.78); margin-top: 4px; }
+  .top-match .go { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+  .top-match .go .btn { flex: 1; }
+  .score { font-size: 15px; font-weight: 800; color: var(--green-700); flex-shrink: 0; }
+  .p { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+  .p .top { display: flex; align-items: center; gap: 12px; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <div class="pagehead">
-          <a class="circle-btn" href="groups.html" aria-label="Back">
-            <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          </a>
-          <h1>Get matched</h1>
-        </div>
-
-        <div class="chiprow" style="margin-top:16px">
-          <span class="chip">All</span>
-          <span class="chip selected">MTH 111</span>
-          <span class="chip">PHY 101</span>
-        </div>
-
-        <div class="section-h">
-          <h3>Groups</h3>
-        </div>
-        <div class="card sugg">
-          <div class="tile">MTH</div>
-          <div class="row-main">
-            <div class="row-title">MTH 111 Squad <span class="matchpill">92%</span></div>
-            <div class="row-sub">4 shared free slots</div>
-          </div>
-          <button class="btn small">Ask to join</button>
-        </div>
-        <div class="card sugg">
-          <div class="tile mango">PHY</div>
-          <div class="row-main">
-            <div class="row-title">Evening Set <span class="matchpill">74%</span></div>
-            <div class="row-sub">3 shared free slots</div>
-          </div>
-          <button class="btn small">Ask to join</button>
-        </div>
-
-        <div class="section-h">
-          <h3>Partners</h3>
-        </div>
-        <div class="card sugg">
-          <span class="avatar">CN</span>
-          <div class="row-main">
-            <div class="row-title">Chidi N. <span class="matchpill">88%</span></div>
-            <div class="row-sub">Computer Science · 4 shared slots</div>
-          </div>
-          <button class="btn small secondary">Invite</button>
-        </div>
-        <div class="card sugg">
-          <span class="avatar" style="background:var(--accent-soft); color:var(--accent-deep)">FA</span>
-          <div class="row-main">
-            <div class="row-title">Fola A. <span class="matchpill">81%</span></div>
-            <div class="row-sub">Statistics · 3 shared slots</div>
-          </div>
-          <button class="btn small secondary">Invite</button>
-        </div>
-
-        <div class="notecard" style="margin-top:16px">Percentages come from shared free slots and shared courses.</div>
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="groups.html" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="t"><b>Get matched</b><span>By shared free time</span></div>
+        <span></span>
       </div>
 
-      <div class="tabbar">
-        <a class="tab" href="home.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          Home
-        </a>
-        <a class="tab active" href="groups.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          Groups
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          Inbox
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Profile
-        </a>
+      <div class="sheet plain">
+        <div class="ptabs"><span class="on">MTH 111</span><span>PHY 101</span><span>CSC 121</span></div>
+
+        <div class="h-section"><h3>Best match</h3></div>
+        <div class="top-match">
+          <span class="pct">92%</span>
+          <div class="k">92% match</div>
+          <h2>MTH 111 Squad</h2>
+          <p>4 members · free together 4 times a week</p>
+          <div class="go"><button class="btn white">Ask to join</button></div>
+        </div>
+
+        <div class="stack" style="margin-top:10px">
+          <div class="item">
+            <span class="tile c5">EVE</span>
+            <div class="item-main"><div class="item-title">Evening Set</div><div class="item-sub">3 members <span class="dot"></span> 3 shared slots</div></div>
+            <span class="score">74%</span>
+          </div>
+        </div>
+
+        <div class="h-section"><h3>Start a group with</h3></div>
+        <div class="stack">
+          <div class="item p">
+            <div class="top">
+              <span class="avatar c5">CN</span>
+              <div class="item-main"><div class="item-title">Chidi N.</div><div class="item-sub">Computer Science <span class="dot"></span> 4 shared</div></div>
+              <span class="score">88%</span>
+            </div>
+            <button class="btn small outline block"><i data-icon="user-plus" class="sm"></i>Start a group together</button>
+          </div>
+          <div class="item p">
+            <div class="top">
+              <span class="avatar c4">FA</span>
+              <div class="item-main"><div class="item-title">Fola A.</div><div class="item-sub">Statistics <span class="dot"></span> 3 shared</div></div>
+              <span class="score">81%</span>
+            </div>
+            <button class="btn small outline block"><i data-icon="user-plus" class="sm"></i>Start a group together</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-  <p class="caption">Match. Suggestions per course, scored by shared free slots.</p>
+  <p class="caption">Get matched. Pill tabs per course, the best group as a green feature card, partners below with their score.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>

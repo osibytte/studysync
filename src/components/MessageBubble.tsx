@@ -128,8 +128,8 @@ const styles = StyleSheet.create({
   columnMine: { alignItems: 'flex-end' },
   sender: {
     fontSize: fontSize.xs,
-    fontFamily: FONT.semi,
-    color: colors.primaryDark,
+    fontFamily: FONT.bold,
+    color: colors.textSecondary,
     marginBottom: 2,
     marginLeft: spacing.xs,
   },
@@ -140,15 +140,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  // primaryStrong is the deep end of periwinkle: white body text stays readable
-  // in daylight, which the lighter hero tint does not guarantee.
-  bubbleMine: { backgroundColor: colors.primaryStrong, borderBottomRightRadius: radius.sm },
+  // Mine in ink with white text, theirs in pale grey on the white sheet.
+  bubbleMine: { backgroundColor: colors.primaryStrong, borderBottomRightRadius: 6 },
   bubbleTheirs: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderBottomLeftRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.surfaceAlt,
+    borderBottomLeftRadius: 6,
   },
-  bubbleGone: { backgroundColor: colors.surfaceAlt },
+  bubbleGone: { backgroundColor: colors.surface, borderColor: colors.border },
   bubblePressed: { opacity: 0.75 },
   body: { fontSize: fontSize.md, fontFamily: FONT.regular, color: colors.text, lineHeight: 22 },
   bodyMine: { color: colors.textInverse },
@@ -157,7 +156,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
   },
   confirmText: { fontSize: fontSize.xs, color: colors.text, lineHeight: 18 },
   confirmRow: { flexDirection: 'row', marginTop: spacing.sm },

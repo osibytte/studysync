@@ -23,7 +23,7 @@ import {
 import { createGroup, findGroup, requestToJoin, sendInvitation } from '@/lib/groups';
 import { makeActionId } from '@/lib/ids';
 import { friendlyError } from '@/lib/supabase';
-import { FONT, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing, shadowCard } from '@/theme';
 import type { GroupStatus } from '@/types/database';
 import type { FindGroupResponse, ScoredGroup, ScoredStudent } from '@/types/matching';
 
@@ -150,7 +150,7 @@ export default function MatchScreen() {
     <Screen
       title="Suggested for you"
       subtitle="Ranked by how much of your week lines up with theirs."
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {coursesLoading && userCourses.length === 0 ? (
         <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
@@ -361,9 +361,9 @@ const styles = StyleSheet.create({
   card: {
     marginTop: spacing.md,
     padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {

@@ -17,7 +17,7 @@ import {
 } from '@/lib/availability';
 import { enqueue } from '@/lib/outbox';
 import { friendlyError, supabase } from '@/lib/supabase';
-import { colors, fontSize, radius, spacing } from '@/theme';
+import { colors, fontSize, radius, spacing, shadowCard, FONT } from '@/theme';
 
 /**
  * Onboarding step 3 of 3 — weekly availability.
@@ -144,7 +144,9 @@ export default function OnboardingAvailabilityScreen() {
     >
       <StepHeader step={3} total={3} />
 
-      <AvailabilityGrid grid={grid} onChange={setGrid} />
+      <View style={styles.gridCard}>
+        <AvailabilityGrid grid={grid} onChange={setGrid} />
+      </View>
 
       <View style={styles.noteBox}>
         <Text style={styles.noteText}>
@@ -163,12 +165,18 @@ export default function OnboardingAvailabilityScreen() {
 }
 
 const styles = StyleSheet.create({
-  noteBox: {
-    marginTop: spacing.xl,
-    padding: spacing.md,
+  gridCard: {
     backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    ...shadowCard,
+  },
+  noteBox: {
+    marginTop: spacing.lg,
+    padding: spacing.md + 2,
+    backgroundColor: colors.primarySoft,
     borderRadius: radius.md,
   },
-  noteText: { fontSize: fontSize.xs, color: colors.textMuted, lineHeight: 18 },
+  noteText: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textSecondary, lineHeight: 18 },
   formError: { color: colors.danger, fontSize: fontSize.sm, marginTop: spacing.md },
 });

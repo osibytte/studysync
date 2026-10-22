@@ -1,8 +1,10 @@
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
+import { Initials, courseTag, initialsOf } from '@/components/Initials';
 import { StatusPill } from '@/components/StatusPill';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/context/AuthContext';
@@ -34,7 +36,7 @@ import { enqueue } from '@/lib/outbox';
 import { refreshReminders } from '@/lib/reminders';
 import { friendlyError } from '@/lib/supabase';
 import { validateGroupName } from '@/lib/validation';
-import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing, shadowCard, typography } from '@/theme';
 
 /**
  * One group: who is in it, when it can meet, who wants in, and what you can do
@@ -178,7 +180,7 @@ export default function GroupDetailScreen() {
 
   if (loading && !group) {
     return (
-      <Screen title="Group">
+      <Screen title="Group" onBack={() => router.back()}>
         <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
       </Screen>
     );
@@ -188,6 +190,7 @@ export default function GroupDetailScreen() {
     return (
       <Screen
         title="Group unavailable"
+        onBack={() => router.back()}
         footer={
           <Button label="Back to groups" onPress={() => router.replace('/(app)/groups')} />
         }
@@ -202,59 +205,65 @@ export default function GroupDetailScreen() {
 
   return (
     <Screen
-      title={group.group_name}
+      onBack={() => router.back()}
       footer={
-        <View>
-          {/*
-            Chat is the primary action, and the only one that works offline: it
-            is where the group actually happens — messages, and the study times
-            it proposes, answers and calls off. Inviting shares the second row
-            with Back so three stacked full-width buttons do not take a third of
-            the screen on the entry-level phones this app is for.
-          */}
-          <Button
-            label="Open chat"
-            onPress={() => router.push(`/(app)/groups/${group.group_id}/chat`)}
-            accessibilityHint="Messages, and the study times this group has proposed"
-          />
-          <View style={styles.footerRow}>
-            {showInvite && (
-              <Button
-                label="Invite someone"
-                variant="secondary"
-                fullWidth={false}
-                onPress={() => router.push(`/(app)/groups/${group.group_id}/invite`)}
-                accessibilityHint="Search students on this course and invite one"
-                style={styles.footerRowButton}
-              />
-            )}
-            <Button
-              label="Back"
-              variant="ghost"
-              fullWidth={false}
-              onPress={() => router.back()}
-              style={styles.footerRowButton}
-            />
-          </View>
-        </View>
+        // Chat is the primary action, and the only one that works offline: it
+        // is where the group actually happens — messages, and the study times
+        // it proposes, answers and calls off.
+        <Button
+          label="Open chat"
+          onPress={() => router.push(`/(app)/groups/${group.group_id}/chat`)}
+          accessibilityHint="Messages, and the study times this group has proposed"
+        />
       }
     >
-      <View style={styles.headerRow}>
-        <StatusPill status={group.status} />
-        <Text style={styles.headerCourse}>
-          {group.course?.course_code ?? '—'}
+      <View style={styles.identity}>
+        <Initials
+          text={courseTag(group.course?.course_code)}
+          colorKey={group.group_id}
+          size={84}
+          ring
+        />
+        <Text style={styles.groupName} accessibilityRole="header">
+          {group.group_name}
         </Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerCourse}>{group.course?.course_code ?? '—'}</Text>
+          <Text style={styles.capacity}>
+            {' · '}
+            {capacityLabel(memberCount, group.max_members)}
+            {live && seatsLeft(memberCount, group.max_members) > 0
+              ? ` · ${seatsLeft(memberCount, group.max_members)} free`
+              : ''}
+          </Text>
+          <StatusPill status={group.status} />
+        </View>
+        {!!group.course?.course_title && (
+          <Text style={styles.courseTitle}>{group.course.course_title}</Text>
+        )}
+        <Text style={styles.statusHint}>{STATUS_HINT[group.status]}</Text>
       </View>
-      <Text style={styles.statusHint}>{STATUS_HINT[group.status]}</Text>
-      {!!group.course?.course_title && (
-        <Text style={styles.courseTitle}>{group.course.course_title}</Text>
-      )}
-      <Text style={styles.capacity}>
-        {capacityLabel(memberCount, group.max_members)}
-        {live && seatsLeft(memberCount, group.max_members) > 0
-          ? ` · ${seatsLeft(memberCount, group.max_members)} free`
-          : ''}
-      </Text>
+
+      <View style={styles.quick}>
+        <QuickTile
+          icon="message-square"
+          label="Chat"
+          onPress={() => router.push(`/(app)/groups/${group.group_id}/chat`)}
+        />
+        <QuickTile
+          icon="folder"
+          label="Files"
+          onPress={() => router.push(`/(app)/groups/${group.group_id}/files`)}
+        />
+        {showInvite && (
+          <QuickTile
+            icon="user-plus"
+            label="Invite"
+            hint="Search students on this course and invite one"
+            onPress={() => router.push(`/(app)/groups/${group.group_id}/invite`)}
+          />
+        )}
+      </View>
 
       {!isOnline && (
         <Text style={styles.note}>
@@ -287,7 +296,7 @@ export default function GroupDetailScreen() {
           availability is holding this back.
         </Text>
       ) : (
-        <>
+        <View style={styles.meetCard}>
           <Text style={styles.body}>{describeSelection(commonGrid, 6)}</Text>
           <Text style={styles.bodyMuted}>
             {commonCount} slot{commonCount === 1 ? '' : 's'} {meetRule}.
@@ -295,7 +304,7 @@ export default function GroupDetailScreen() {
               ? ''
               : ' Below four members every slot needs everyone; above it, a majority.'}
           </Text>
-        </>
+        </View>
       )}
 
       <Text style={styles.sectionHeader}>Members</Text>
@@ -304,6 +313,12 @@ export default function GroupDetailScreen() {
       ) : (
         members.map((member) => (
           <View key={member.user_id} style={styles.row}>
+            <Initials
+              text={initialsOf(member.full_name)}
+              colorKey={member.user_id}
+              size={44}
+              shape="circle"
+            />
             <View style={styles.rowText}>
               <Text style={styles.rowName}>
                 {memberLine(member)}
@@ -490,7 +505,7 @@ export default function GroupDetailScreen() {
                 )
               }
               disabled={actionsDisabled}
-              trackColor={{ true: colors.accent, false: colors.border }}
+              trackColor={{ true: colors.primary, false: colors.borderStrong }}
               accessibilityLabel="Show this group on browse"
             />
           </View>
@@ -566,23 +581,83 @@ export default function GroupDetailScreen() {
   );
 }
 
+/** One of the three square shortcuts under the group's name. */
+function QuickTile({
+  icon,
+  label,
+  hint,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  label: string;
+  hint?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      style={({ pressed }) => [styles.quickTile, pressed && styles.quickPressed]}
+    >
+      <Feather name={icon} size={20} color={colors.text} />
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   loader: { marginVertical: spacing.xl },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  headerCourse: {
-    fontSize: fontSize.sm,
-    fontFamily: FONT.bold,
-    color: colors.primaryDark,
-    marginLeft: spacing.sm,
+  identity: { alignItems: 'center', paddingTop: spacing.sm },
+  groupName: {
+    ...typography.title,
+    fontFamily: FONT.extra,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  headerCourse: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.textSecondary },
   statusHint: {
     fontSize: fontSize.xs,
+    fontFamily: FONT.regular,
     color: colors.textMuted,
     marginTop: spacing.sm,
     lineHeight: 18,
+    textAlign: 'center',
   },
-  courseTitle: { fontSize: fontSize.sm, color: colors.text, marginTop: spacing.sm },
-  capacity: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: spacing.xs },
+  courseTitle: {
+    fontSize: fontSize.sm,
+    fontFamily: FONT.regular,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  capacity: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted, marginRight: spacing.xs },
+  quick: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl - 4 },
+  quickTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md + 2,
+    borderRadius: radius.lg - 2,
+    backgroundColor: colors.surface,
+    ...shadowCard,
+  },
+  quickPressed: { opacity: 0.8 },
+  quickLabel: { fontSize: fontSize.sm - 1, fontFamily: FONT.semi, color: colors.text },
+  meetCard: {
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+  },
   note: {
     fontSize: fontSize.xs,
     color: colors.textMuted,
@@ -590,13 +665,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   sectionHeader: {
-    fontSize: fontSize.md,
-    fontFamily: FONT.bold,
-    color: colors.text,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
+    ...typography.section,
+    marginTop: spacing.xl + 2,
+    marginBottom: spacing.md,
+    paddingHorizontal: 2,
   },
-  body: { fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
+  body: { fontSize: fontSize.md, fontFamily: FONT.semi, color: colors.primaryDark, lineHeight: 22 },
   bodyMuted: {
     fontSize: fontSize.xs,
     color: colors.textMuted,
@@ -604,24 +678,30 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   emptyText: { fontSize: fontSize.sm, color: colors.textMuted, lineHeight: 20 },
+  // Each member is a card of their own, like the people in the reference.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 72,
+    paddingHorizontal: spacing.md + 2,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    marginBottom: spacing.sm,
+    ...shadowCard,
   },
   rowText: { flex: 1, paddingRight: spacing.sm },
-  rowName: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
+  rowName: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
   rowMeta: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
   rowActions: { flexDirection: 'row', alignItems: 'center' },
   smallButton: { paddingHorizontal: spacing.md, marginLeft: spacing.xs },
   requestCard: {
     marginTop: spacing.sm,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
   requestActions: { flexDirection: 'row', marginTop: spacing.sm },
   /**
@@ -633,11 +713,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: MIN_TOUCH,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    minHeight: 60,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    ...shadowCard,
   },
   linkRowText: { flex: 1, fontSize: fontSize.sm, color: colors.text, paddingRight: spacing.sm },
   linkRowAction: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
@@ -645,15 +726,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    ...shadowCard,
   },
   switchText: { flex: 1, paddingRight: spacing.md },
   confirmCard: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.surface,
+    ...shadowCard,
     marginTop: spacing.sm,
   },
   confirmText: {

@@ -19,7 +19,7 @@ import { useUserCourses } from '@/hooks/useUserCourses';
 import { canRequestToJoin, capacityLabel, isFull, seatsLeft } from '@/lib/groupRules';
 import { requestToJoin } from '@/lib/groups';
 import { friendlyError } from '@/lib/supabase';
-import { FONT, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing, shadowCard } from '@/theme';
 import type { DiscoverGroupRow } from '@/types/database';
 
 /**
@@ -91,9 +91,7 @@ export default function DiscoverScreen() {
     <Screen
       title="Open groups"
       subtitle="Groups on your courses that are taking new members."
-      footer={
-        <Button label="Back" variant="secondary" onPress={() => router.back()} />
-      }
+      onBack={() => router.back()}
     >
       {coursesLoading && userCourses.length === 0 ? (
         <ActivityIndicator color={colors.primaryDark} style={styles.loader} />
@@ -123,7 +121,7 @@ export default function DiscoverScreen() {
             <Switch
               value={onlyOpen}
               onValueChange={setOnlyOpen}
-              trackColor={{ true: colors.accent, false: colors.border }}
+              trackColor={{ true: colors.primary, false: colors.borderStrong }}
               accessibilityLabel="Show only groups with a free seat"
             />
           </View>
@@ -238,9 +236,9 @@ const styles = StyleSheet.create({
   card: {
     marginTop: spacing.md,
     padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardName: {

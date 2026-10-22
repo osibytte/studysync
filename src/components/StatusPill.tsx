@@ -23,25 +23,27 @@ export function StatusPill({ status }: { status: GroupStatus }) {
 const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
   text: { fontSize: fontSize.xs, fontFamily: FONT.semi },
 });
 
+// Solid fills with white text for the live states, so they read at a glance;
+// the quiet states stay grey.
 const toneStyles: Record<GroupStatus, { backgroundColor: string }> = {
-  forming: { backgroundColor: colors.primarySoft },
-  active: { backgroundColor: colors.successSoft },
+  forming: { backgroundColor: colors.info },
+  active: { backgroundColor: colors.success },
   dormant: { backgroundColor: colors.surfaceAlt },
   archived: { backgroundColor: colors.surfaceAlt },
   disbanded: { backgroundColor: colors.surfaceAlt },
 };
 
 const toneText: Record<GroupStatus, { color: string }> = {
-  forming: { color: colors.primaryDark },
-  active: { color: colors.success },
-  dormant: { color: colors.textMuted },
-  archived: { color: colors.textMuted },
-  disbanded: { color: colors.textMuted },
+  forming: { color: colors.textInverse },
+  active: { color: colors.textInverse },
+  dormant: { color: colors.textSecondary },
+  archived: { color: colors.textSecondary },
+  disbanded: { color: colors.textSecondary },
 };

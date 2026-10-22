@@ -19,7 +19,7 @@
       "package": "com.studysync.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#8B8BF5"
+        "backgroundColor": "#1C6440"
       },
       "permissions": [
         "SCHEDULE_EXACT_ALARM"
@@ -32,7 +32,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#8B8BF5",
+          "backgroundColor": "#1C6440",
           "resizeMode": "contain"
         }
       ]

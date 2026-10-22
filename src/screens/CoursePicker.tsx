@@ -23,7 +23,7 @@ import {
 } from '@/lib/groupRules';
 import { enqueue } from '@/lib/outbox';
 import { friendlyError, isNetworkError, supabase } from '@/lib/supabase';
-import { FONT, MIN_TOUCH, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, MIN_TOUCH, colors, fontSize, radius, shadowCard, spacing } from '@/theme';
 import type { Course, Proficiency, UserCourseWithDetail } from '@/types/database';
 
 interface Props {
@@ -304,6 +304,8 @@ export function CoursePicker({
         'Pick only the courses you want a study group for, then say how you are finding each one. You can change both later.'
       }
       scroll={false}
+      // Editing later is a pushed screen with a way back; onboarding is a step.
+      onBack={showStepHeader ? undefined : onDone}
       footer={
         <>
           {!!unratedNote && (
@@ -443,14 +445,15 @@ export function CoursePicker({
 
 const styles = StyleSheet.create({
   search: {
-    minHeight: MIN_TOUCH,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    minHeight: 52,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg + 2,
     fontSize: fontSize.md,
+    fontFamily: FONT.regular,
     color: colors.text,
+    backgroundColor: colors.surface,
     marginBottom: spacing.md,
+    ...shadowCard,
   },
   // A ScrollView rather than a FlatList: the seeded list is short enough that
   // virtualisation costs more than it saves on an entry-level device. It does have
@@ -463,13 +466,14 @@ const styles = StyleSheet.create({
     minHeight: MIN_TOUCH + 8,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
     marginBottom: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+    ...shadowCard,
   },
-  rowSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  rowSelected: { borderColor: colors.accent },
   // Square off the bottom of a picked row so it reads as one card with the rating
   // block underneath it, rather than two unrelated things that happen to be close.
   rowAttached: {
@@ -479,12 +483,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   rating: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderTopWidth: 0,
     borderColor: colors.accent,
-    borderBottomLeftRadius: radius.md,
-    borderBottomRightRadius: radius.md,
-    backgroundColor: colors.accentSoft,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
     marginBottom: spacing.sm,
@@ -508,15 +512,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
     marginBottom: spacing.sm,
   },
-  optionOn: { borderColor: colors.primaryDark, borderWidth: 2 },
+  optionOn: { borderColor: colors.accent, backgroundColor: colors.surface },
   optionText: { flex: 1, paddingLeft: spacing.sm },
   optionLabel: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.text },
-  optionLabelOn: { color: colors.primaryDark },
+  optionLabelOn: { color: colors.text },
   hint: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
   radio: {
     width: 22,
@@ -528,15 +532,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 1,
   },
-  radioOn: { borderColor: colors.primary },
+  radioOn: { borderColor: colors.accent },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.accent,
   },
   rowText: { flex: 1, paddingRight: spacing.md },
-  code: { fontSize: fontSize.sm, fontFamily: FONT.bold, color: colors.primaryDark },
+  code: { fontSize: fontSize.md, fontFamily: FONT.bold, color: colors.text },
   title: { fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
   checkbox: {
     width: 26,
@@ -548,7 +552,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  checkMark: { color: colors.primaryDark, fontFamily: FONT.bold, fontSize: fontSize.sm },
+  checkMark: { color: colors.textInverse, fontFamily: FONT.bold, fontSize: fontSize.sm },
   centered: {
     flex: 1,
     alignItems: 'center',

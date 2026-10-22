@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNetwork } from '@/context/NetworkContext';
-import { FONT, colors, fontSize, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing } from '@/theme';
 
 /**
  * Persistent connectivity strip.
@@ -18,7 +18,8 @@ import { FONT, colors, fontSize, spacing } from '@/theme';
  * Renders nothing when online and empty, so it costs no vertical space in the
  * normal case.
  */
-export function OfflineBanner() {
+/** `rounded` when it sits inside the green band rather than edge to edge. */
+export function OfflineBanner({ rounded = false }: { rounded?: boolean } = {}) {
   const { isOnline, pending, syncing, syncNow } = useNetwork();
 
   if (isOnline && pending === 0) return null;
@@ -34,7 +35,13 @@ export function OfflineBanner() {
   const tappable = isOnline && !syncing && pending > 0;
 
   const body = (
-    <View style={[styles.banner, !isOnline ? styles.offline : styles.pendingSync]}>
+    <View
+      style={[
+        styles.banner,
+        !isOnline ? styles.offline : styles.pendingSync,
+        rounded && styles.rounded,
+      ]}
+    >
       <Text style={styles.text} numberOfLines={2}>
         {message}
       </Text>
@@ -67,6 +74,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
+  rounded: { borderRadius: radius.md, marginTop: spacing.xs },
   offline: { backgroundColor: colors.offline },
   pendingSync: { backgroundColor: colors.warning },
   text: {

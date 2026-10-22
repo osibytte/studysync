@@ -119,7 +119,7 @@ export default function InviteScreen() {
     <Screen
       title="Invite someone"
       subtitle={group ? `To ${group.group_name}` : undefined}
-      footer={<Button label="Back" variant="secondary" onPress={() => router.back()} />}
+      onBack={() => router.back()}
     >
       {detailLoading && !group ? (
         <ActivityIndicator color={colors.primaryDark} style={styles.loader} />

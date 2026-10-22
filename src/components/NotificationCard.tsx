@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { notificationWhenLabel } from '@/lib/notificationRules';
-import { FONT, colors, fontSize, radius, spacing } from '@/theme';
+import { FONT, colors, fontSize, radius, spacing, shadowCard } from '@/theme';
 import type { Notification } from '@/types/database';
 
 interface Props {
@@ -52,11 +52,8 @@ export function NotificationCard({ row, onPress, onDismiss, disabledReason = nul
           <Text style={[styles.title, !unread && styles.titleRead]} numberOfLines={2}>
             {row.title}
           </Text>
-          {unread && (
-            <View style={styles.newPill}>
-              <Text style={styles.newPillText}>New</Text>
-            </View>
-          )}
+          {/* The label already opens with "New." for a screen reader. */}
+          {unread && <View style={styles.newPill} />}
         </View>
         <Text style={[styles.text, !unread && styles.textRead]}>{row.body}</Text>
         <Text style={styles.when}>{when}</Text>
@@ -83,51 +80,51 @@ export function NotificationCard({ row, onPress, onDismiss, disabledReason = nul
 }
 
 const styles = StyleSheet.create({
+  // Its own white card, like every list item; unread gets a green edge, a
+  // green dot and heavier type, so the dot is never the only signal.
   card: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    borderWidth: 1.5,
-    borderColor: colors.border,
     borderRadius: radius.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm + 2,
     backgroundColor: colors.surface,
     overflow: 'hidden',
+    ...shadowCard,
   },
-  cardUnread: { borderColor: colors.borderStrong },
-  unreadBar: { width: 4, backgroundColor: colors.flame },
-  body: { flex: 1, padding: spacing.md },
+  cardUnread: {},
+  unreadBar: { width: 4, backgroundColor: colors.primaryMuted },
+  body: { flex: 1, paddingVertical: spacing.md + 2, paddingHorizontal: spacing.lg },
   pressed: { backgroundColor: colors.surfaceAlt },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
   title: {
     flex: 1,
-    fontSize: fontSize.sm,
-    fontFamily: FONT.semi,
+    fontSize: fontSize.md,
+    fontFamily: FONT.bold,
     color: colors.text,
   },
-  titleRead: { color: colors.textMuted, fontFamily: FONT.regular },
+  titleRead: { fontFamily: FONT.semi, color: colors.textSecondary },
   newPill: {
     marginLeft: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.pill,
-    backgroundColor: colors.flameSoft,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.primaryMuted,
   },
-  newPillText: { fontSize: fontSize.xs, fontFamily: FONT.bold, color: colors.flame },
   text: {
     fontSize: fontSize.sm,
     fontFamily: FONT.regular,
-    color: colors.text,
+    color: colors.textSecondary,
     lineHeight: 20,
-    marginTop: spacing.xs,
+    marginTop: 3,
   },
   textRead: { color: colors.textMuted },
-  when: { fontSize: fontSize.xs, fontFamily: FONT.regular, color: colors.textMuted, marginTop: spacing.xs },
+  when: { fontSize: fontSize.xs, fontFamily: FONT.medium, color: colors.textMuted, marginTop: spacing.sm },
   dismiss: {
     justifyContent: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.md + 2,
     borderLeftWidth: 1,
     borderLeftColor: colors.border,
   },
   dismissDisabled: { opacity: 0.4 },
-  dismissText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.primaryDark },
+  dismissText: { fontSize: fontSize.xs, fontFamily: FONT.semi, color: colors.text },
 });

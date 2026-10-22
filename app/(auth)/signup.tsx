@@ -2,6 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { AuthShell } from '@/components/AuthShell';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/context/AuthContext';
@@ -75,10 +76,9 @@ export default function SignupScreen() {
   }
 
   return (
-    <Screen
-      title="Create your account"
-      subtitle="Takes about a minute. You'll pick your courses next."
-      centered
+    <AuthShell
+      title="Find people to study with"
+      lead="Takes about a minute. You'll pick your courses next."
     >
       <View style={styles.form}>
         <TextField
@@ -145,12 +145,12 @@ export default function SignupScreen() {
           </Link>
         </View>
       </View>
-    </Screen>
+    </AuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  form: { marginTop: spacing.md },
+  form: {},
   formError: { color: colors.danger, fontSize: fontSize.sm, marginBottom: spacing.md },
   footerRow: {
     flexDirection: 'row',
@@ -159,9 +159,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   footerText: { fontSize: fontSize.sm, fontFamily: FONT.regular, color: colors.textMuted },
-  link: { fontSize: fontSize.sm, fontFamily: FONT.semi, color: colors.primaryDark },
+  link: {
+    fontSize: fontSize.sm,
+    fontFamily: FONT.bold,
+    color: colors.text,
+    textDecorationLine: 'underline',
+  },
   noticeBox: {
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: radius.lg,
     padding: spacing.lg,
     marginBottom: spacing.xl,

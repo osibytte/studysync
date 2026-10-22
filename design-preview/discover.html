@@ -6,91 +6,68 @@
 <title>Discover · StudySync preview</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  .filters { margin-top: 16px; }
-  .toggle { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
-  .toggle b { font-size: 15px; font-weight: 700; flex: 1; }
-  .join-card { display: flex; align-items: center; gap: 12px; }
+  .seats { display: flex; gap: 3px; margin-top: 8px; }
+  .seats i { width: 14px; height: 6px; border-radius: 3px; background: var(--line); }
+  .seats i.on { background: var(--green-600); }
+  .g { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+  .g .top { display: flex; align-items: center; gap: 12px; }
 </style>
 </head>
 <body>
   <div class="phone">
-    <div class="statusbar">
-      <span>9:41</span>
-      <span style="display:flex; align-items:center">
-        <span class="sig"><i></i><i></i><i></i></span>
-        <span class="batt"></span>
-      </span>
-    </div>
     <div class="screen">
-      <div class="content">
-        <div class="pagehead">
-          <a class="circle-btn" href="groups.html" aria-label="Back">
-            <svg class="ic" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          </a>
-          <h1>Discover</h1>
-        </div>
+      <div class="statusbar"></div>
+      <div class="pushhead">
+        <a class="round" href="groups.html" aria-label="Back"><i data-icon="chevron-left"></i></a>
+        <div class="t"><b>Discover</b><span>Open groups in your courses</span></div>
+        <span></span>
+      </div>
 
-        <div class="chiprow filters">
+      <div class="sheet plain">
+        <div class="chips">
           <span class="chip">All</span>
-          <span class="chip selected">MTH 111</span>
+          <span class="chip on">MTH 111</span>
           <span class="chip">PHY 101</span>
           <span class="chip">CSC 121</span>
         </div>
 
-        <div class="toggle">
-          <b>Open groups only</b>
-          <span class="switch"><i></i></span>
+        <div class="rows" style="margin-top:16px">
+          <div class="r"><div class="rt"><b>Open groups only</b><span>Hide groups that need approval</span></div><span class="switch off"><i></i></span></div>
         </div>
 
-        <div class="section-h"><h3>MTH 111</h3></div>
-        <div class="card join-card">
-          <div class="tile">MTH</div>
-          <div class="row-main">
-            <div class="row-title">MTH 111 Squad</div>
-            <div class="row-sub">4 of 5 slots filled</div>
+        <div class="h-section"><h3>3 groups in MTH 111</h3></div>
+        <div class="stack">
+          <div class="item g">
+            <div class="top">
+              <span class="tile c1">CAL</span>
+              <div class="item-main"><div class="item-title">Calculus Crew</div><div class="item-sub">4 of 5 seats taken <span class="dot"></span> Open</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div>
+              <button class="btn small">Join</button>
+            </div>
           </div>
-          <button class="btn small">Join</button>
-        </div>
-        <div class="card join-card">
-          <div class="tile lime">GRN</div>
-          <div class="row-main">
-            <div class="row-title">Grace &amp; Co</div>
-            <div class="row-sub">3 of 6 slots filled</div>
+          <div class="item g">
+            <div class="top">
+              <span class="tile c5">GRC</span>
+              <div class="item-main"><div class="item-title">Grace &amp; Co</div><div class="item-sub">3 of 6 seats taken <span class="dot"></span> Approval</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+              <button class="btn small outline">Ask</button>
+            </div>
           </div>
-          <button class="btn small">Join</button>
-        </div>
-        <div class="card join-card">
-          <div class="tile mango">TUT</div>
-          <div class="row-main">
-            <div class="row-title">Tuesday Tutors</div>
-            <div class="row-sub">5 of 5 slots filled</div>
+          <div class="item g">
+            <div class="top">
+              <span class="tile c3">TUT</span>
+              <div class="item-main"><div class="item-title">Tuesday Tutors</div><div class="item-sub">5 of 5 seats taken</div>
+                <div class="seats"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+              <button class="btn small" disabled>Full</button>
+            </div>
           </div>
-          <button class="btn small secondary" style="opacity:.55">Full</button>
         </div>
 
-        <div class="notecard" style="margin-top:16px">Joining is instant for open groups. Closed ones send a request to the admin.</div>
-      </div>
-
-      <div class="tabbar">
-        <a class="tab" href="home.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          Home
-        </a>
-        <a class="tab active" href="groups.html">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          Groups
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          Inbox
-        </a>
-        <a class="tab" href="#">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Profile
-        </a>
+        <div class="note" style="margin-top:16px"><i data-icon="info" class="sm"></i><span>Open groups add you right away. The rest send a request to the group admin.</span></div>
       </div>
     </div>
   </div>
-  <p class="caption">Discover. Filter by course, join open groups in one tap.</p>
+  <p class="caption">Discover. Black chip for the course you're browsing, seats shown as a small bar so full groups read at a glance.</p>
+  <script src="chrome.js"></script>
 </body>
 </html>
