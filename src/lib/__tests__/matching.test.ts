@@ -11,6 +11,8 @@ import {
   proficiencyMixScore,
   rankCandidates,
   scoreBreakdown,
+  strugglingCap,
+  violatesComposition,
 } from '../matching';
 import { type AvailabilityGrid, emptyGrid } from '../availability';
 
@@ -370,8 +372,10 @@ describe('isolatedByProficiency', () => {
 /**
  * partitionIntoGroups powers admin-initiated batch (system) matching: it carves a
  * course's waiting pool into study groups. The risky properties are (a) nobody is
- * ever silently dropped, and (b) the "random 3-6, never strand a single" sizing
- * rule the product decided. Randomness is injected via pickSize so these are
+ * ever silently dropped, (b) the "random 3-5, never strand a single" sizing
+ * rule the product decided, and (c) the hard composition caps — at most one
+ * brilliant student per group, strugglers capped by size — hold whenever the
+ * pool offers an alternative. Randomness is injected via pickSize so these are
  * deterministic. This logic is mirrored to the Deno side — mirror.test.ts guards
  * that copy; these tests guard the behaviour.
  */
@@ -405,16 +409,16 @@ describe('partitionIntoGroups', () => {
   });
 
   it('makes one group when the whole pool fits under the max size', () => {
-    const pool = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => member(id, [0]));
-    const { groups, waiting } = partitionIntoGroups(pool); // n=6, default max 6
+    const pool = ['a', 'b', 'c', 'd', 'e'].map((id) => member(id, [0]));
+    const { groups, waiting } = partitionIntoGroups(pool); // n=5, default max 5
     expect(waiting).toEqual([]);
     expect(groups).toHaveLength(1);
-    expect(groups[0].memberIds).toHaveLength(6);
+    expect(groups[0].memberIds).toHaveLength(5);
   });
 
-  it('shrinks a target that would strand exactly one (7, pick 6 -> sizes 5 + 2)', () => {
+  it('shrinks a target that would strand exactly one (7, pick 5 -> sizes 5 + 2)', () => {
     const pool = Array.from({ length: 7 }, (_, i) => member(`u${i}`, [0]));
-    const { groups, waiting } = partitionIntoGroups(pool, { pickSize: () => 6 });
+    const { groups, waiting } = partitionIntoGroups(pool, { pickSize: () => 5 });
     expect(waiting).toEqual([]);
     expect(groups.map((g) => g.memberIds.length).sort((a, b) => a - b)).toEqual([2, 5]);
   });
@@ -507,7 +511,7 @@ describe('partitionIntoGroups', () => {
   it('covers every student exactly once across groups and waiting, with sane sizes', () => {
     for (let n = 0; n <= 25; n++) {
       const pool = Array.from({ length: n }, (_, i) => member(`u${i}`, [i % 28]));
-      // Deterministic pseudo-random target size in [3, 6].
+      // Deterministic pseudo-random target size in [3, 5].
       let k = 0;
       const pickSize = (lo: number, hi: number) => lo + (k++ % (hi - lo + 1));
       const { groups, waiting } = partitionIntoGroups(pool, { pickSize });
@@ -518,11 +522,160 @@ describe('partitionIntoGroups', () => {
 
       for (const g of groups) {
         expect(g.memberIds.length).toBeGreaterThanOrEqual(2);
-        expect(g.memberIds.length).toBeLessThanOrEqual(6);
+        expect(g.memberIds.length).toBeLessThanOrEqual(5);
         expect(g.memberIds[0]).toBe(g.seedId); // seed always leads the list
       }
       // Only a lone pool waits; any pool of >= 2 is fully grouped.
       expect(waiting.length).toBe(n === 1 ? 1 : 0);
     }
+  });
+});
+
+/**
+ * The hard composition caps, as a product decision rather than a score: at most
+ * one brilliant student per group, and struggling students capped by size (one
+ * below five members, two at five — ideally never two anywhere). The middle
+ * band is unlimited: those students are the bridge.
+ */
+describe('violatesComposition / strugglingCap', () => {
+  it('allows one brilliant student, refuses a second', () => {
+    expect(violatesComposition([2, 3, 2], 5)).toBe(false);
+    expect(violatesComposition([3, 2, 1, 2], 5)).toBe(false);
+    expect(violatesComposition([3, 3, 2], 5)).toBe(true);
+    expect(violatesComposition([2, 3, 3, 3], 5)).toBe(true);
+  });
+
+  it('caps strugglers at one below five members, two at five', () => {
+    expect(strugglingCap(2)).toBe(1);
+    expect(strugglingCap(3)).toBe(1);
+    expect(strugglingCap(4)).toBe(1);
+    expect(strugglingCap(5)).toBe(2);
+    expect(violatesComposition([1, 2, 2], 3)).toBe(false);
+    expect(violatesComposition([1, 1, 2], 3)).toBe(true);
+    expect(violatesComposition([1, 1, 2, 2], 4)).toBe(true);
+    expect(violatesComposition([1, 1, 2, 2, 2], 5)).toBe(false);
+    expect(violatesComposition([1, 1, 1, 2, 2], 5)).toBe(true);
+  });
+
+  it('ignores unrated members rather than guessing at them', () => {
+    expect(violatesComposition([1, null, 2], 3)).toBe(false);
+    expect(violatesComposition([3, undefined, 3], 4)).toBe(true);
+    expect(violatesComposition([null, undefined, Number.NaN], 3)).toBe(false);
+  });
+});
+
+/**
+ * partitionIntoGroups acting on the caps. The caps are hard while the pool
+ * offers an alternative; the relaxation pass exists for the "no more
+ * available" case, and the demote pass for groups that stop short of five
+ * after taking a second struggler at the target size.
+ */
+describe('partitionIntoGroups: composition caps', () => {
+  function member(
+    id: string,
+    slots: number[] = [],
+    proficiency?: number
+  ): PartitionMember {
+    return { id, profile: { availability: gridFrom(slots), proficiency } };
+  }
+  const levelOf = (pool: PartitionMember[]) =>
+    new Map(pool.map((m) => [m.id, m.profile.proficiency] as const));
+
+  it('never puts two brilliant students in one group while the pool offers an alternative', () => {
+    // n0 has the widest schedule so it seeds; the two brilliant students share
+    // that schedule and would both be top-ranked fillers. The cap refuses the
+    // second, who goes on to anchor a group of their own.
+    const pool = [
+      member('n0', [0, 1, 2, 3, 4, 5]),
+      member('hi1', [0, 1, 2, 3], 3),
+      member('hi2', [0, 1, 2, 3], 3),
+      member('n1', [0], 2),
+      member('n2', [0], 2),
+      member('n3', [0], 2),
+      member('n4', [0], 2),
+      member('n5', [0], 2),
+    ];
+    const levels = levelOf(pool);
+    const { groups, waiting } = partitionIntoGroups(pool, {
+      targetMin: 3,
+      targetMax: 5,
+      pickSize: () => 5,
+    });
+
+    expect(waiting).toEqual([]);
+    expect(groups.filter((g) => g.memberIds.includes('hi1'))).not.toEqual(
+      groups.filter((g) => g.memberIds.includes('hi2'))
+    );
+    for (const g of groups) {
+      expect(
+        violatesComposition(
+          g.memberIds.map((id) => levels.get(id)),
+          g.memberIds.length
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('caps strugglers at one until the group reaches five', () => {
+    // A full group of five may carry two strugglers — the cap's stated
+    // allowance. n1..n3 outscore s1 (mix 1 beats mix 0.5 against a struggling
+    // seed) but s1 still lands: two strugglers at five is allowed.
+    const pool = [
+      member('s0', [0, 1, 2, 3, 4, 5], 1),
+      member('s1', [0, 1, 2, 3], 1),
+      member('n1', [0, 1, 2, 3], 2),
+      member('n2', [0, 1, 2, 3], 2),
+      member('n3', [0, 1, 2, 3], 2),
+    ];
+    const levels = levelOf(pool);
+    const { groups, waiting } = partitionIntoGroups(pool, { pickSize: () => 5 });
+
+    expect(waiting).toEqual([]);
+    expect(groups).toHaveLength(1);
+    const ids = groups[0].memberIds;
+    expect(ids).toHaveLength(5);
+    expect(ids.filter((id) => levels.get(id) === 1).sort()).toEqual(['s0', 's1']);
+    expect(violatesComposition(ids.map((id) => levels.get(id)), 5)).toBe(false);
+  });
+
+  it('gives a second struggler back when the group stops short of five', () => {
+    // s1 is taken at the target of five, where two strugglers are allowed; the
+    // compliant candidates then run out, the group stops at three, and the cap
+    // for a group of three is one. The demote pass returns s1 to the pool,
+    // where the next round pairs them with a brilliant student instead.
+    const pool = [
+      member('s0', [0, 1, 2, 3, 4, 5], 1),
+      member('s1', [0, 1, 2, 3, 4, 5], 1),
+      member('b1', [0, 1, 2, 3, 4, 5], 3),
+      member('b2', [0, 1, 2, 3, 4, 5], 3),
+      member('b3', [0, 1, 2, 3, 4, 5], 3),
+      member('b4', [0, 1, 2, 3, 4, 5], 3),
+      member('n1', [20], 2),
+    ];
+    const { groups, waiting } = partitionIntoGroups(pool, { pickSize: () => 5 });
+
+    expect(waiting).toEqual([]);
+    const s0Group = groups.find((g) => g.memberIds.includes('s0'))!;
+    const s1Group = groups.find((g) => g.memberIds.includes('s1'))!;
+    expect(s0Group).not.toBe(s1Group);
+    for (const g of groups) {
+      const strugglers = g.memberIds.filter((id) =>
+        ['s0', 's1'].includes(id)
+      ).length;
+      expect(strugglers).toBeLessThanOrEqual(g === s0Group && g.memberIds.length === 5 ? 2 : 1);
+    }
+    expect(s1Group.memberIds).toContain('b2'); // paired with an explainer, not abandoned
+  });
+
+  it('relaxes rather than strand people when the pool has nothing else', () => {
+    // Two brilliant students and nobody else: any pairing breaks the
+    // one-brilliant cap. Grouping them anyway is the stated exception — the
+    // alternative is students who wait for a run that will never place them.
+    const pool = [member('b1', [0], 3), member('b2', [0], 3)];
+    const { groups, waiting } = partitionIntoGroups(pool);
+
+    expect(waiting).toEqual([]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].memberIds.slice().sort()).toEqual(['b1', 'b2']);
   });
 });

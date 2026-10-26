@@ -94,7 +94,7 @@ export default function CreateGroupScreen() {
       formation_type: 'self_organized',
       status: 'forming',
       is_discoverable: discoverable,
-      max_members: 8,
+      max_members: 5,
       created_by: userId,
       last_activity_at: new Date().toISOString(),
       created_at: new Date().toISOString(),

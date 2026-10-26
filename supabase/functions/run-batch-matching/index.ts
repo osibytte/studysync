@@ -49,11 +49,10 @@ import { decodeAvailability } from '../_shared/availability.ts';
 import { partitionIntoGroups, type PartitionMember } from '../_shared/matching.ts';
 
 // Guardrails. The pool scan is capped so one enormous course can't turn a batch
-// run into a runaway query; groups form with capacity 8 (the product's soft cap,
-// matching find-group) so a system group of up to 6 still has room for later
-// join requests.
+// run into a runaway query; groups form with capacity 5 (the product's group
+// cap, matching find-group and the groups CHECK in 0027).
 const MAX_POOL = 500;
-const GROUP_MAX_MEMBERS = 8;
+const GROUP_MAX_MEMBERS = 5;
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -135,11 +134,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'min_pool must be 0 or more.' }, 400);
   }
 
-  // target_min/target_max default to the product's 3–6. target_min must be >= 3:
+  // target_min/target_max default to the product's 3–5. target_min must be >= 3:
   // the partitioner's "never strand a single" shrink can drop a target by one, so
   // a floor of 3 guarantees no group smaller than a pair. Cap at the group size.
   const targetMin = intOr(body?.target_min, 3);
-  const targetMax = intOr(body?.target_max, 6);
+  const targetMax = intOr(body?.target_max, 5);
   if (!(targetMin >= 3 && targetMax >= targetMin && targetMax <= GROUP_MAX_MEMBERS)) {
     return json(
       {

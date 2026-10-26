@@ -113,7 +113,7 @@ export interface ScoringProfile {
  *                 or absent when nobody in it has rated the course.
  *   memberCount   how many are already in (1 for a hypothetical pairing = the
  *                 other student; the current size for a real group)
- *   maxMembers    the group's cap (the soft 8, or whatever the group was made
+ *   maxMembers    the group's cap (the soft 5, or whatever the group was made
  *                 with)
  */
 export interface Candidate {
@@ -241,6 +241,55 @@ export function isolatedByProficiency(
   return (low === 1 && high >= 2) || (high === 1 && low >= 2);
 }
 
+/**
+ * Hard composition caps for automatic grouping.
+ *
+ * The product decision is "every group must be effective to study in", and the
+ * failure modes it names are both about the extremes of the scale:
+ *
+ *   * AT MOST ONE BRILLIANT student per group. The brilliant student is the
+ *     explainer; a second one takes a seat another student needed. Absolute —
+ *     a second brilliant joins only when the pool offers nothing else (see
+ *     partitionIntoGroups' relaxation pass).
+ *   * STRUGGLING students capped by size: one in a group of up to four, two in
+ *     a group of five. Ideally never two anywhere — even a pair of strugglers
+ *     has nobody to explain — so the cap of one runs all the way down, and the
+ *     two-at-five allowance exists so a full group can still carry a pair.
+ *
+ * The middle band (band 2, and anyone unrated) is unlimited: those students are
+ * the bridge that keeps a group from splitting into a tutor and a class.
+ */
+export const MAX_BRILLIANT_PER_GROUP = 1;
+export const STRUGGLING_CAP_FULL_GROUP = 2;
+
+/** How many struggling students a group of `size` may carry. */
+export function strugglingCap(size: number): number {
+  return size >= 5 ? STRUGGLING_CAP_FULL_GROUP : 1;
+}
+
+/**
+ * Whether a group of `size` holding `levels` breaks the composition caps.
+ *
+ * Unrated members are ignored rather than guessed at, same as
+ * `isolatedByProficiency`: a blank is not evidence of a band. Levels are
+ * individual students' ratings — the caps COUNT strugglers and brilliant
+ * students, so a group mean would hide them; `band` still clamps, so junk
+ * input cannot push the count off the scale.
+ */
+export function violatesComposition(
+  levels: readonly (number | null | undefined)[],
+  size: number
+): boolean {
+  const rated = levels
+    .filter((level) => level != null && Number.isFinite(level))
+    .map((level) => band(level));
+  if (rated.length === 0) return false;
+  const brilliant = rated.filter((level) => level >= 3).length;
+  if (brilliant > MAX_BRILLIANT_PER_GROUP) return true;
+  const struggling = rated.filter((level) => level <= 1).length;
+  return struggling > strugglingCap(size);
+}
+
 /** A student in the matching pool: their id plus the profile scoring needs. */
 export interface PartitionMember {
   id: string;
@@ -264,7 +313,7 @@ export interface PartitionGroup {
 export interface PartitionOptions {
   /** Smallest random target group size. Default 3. */
   targetMin?: number;
-  /** Largest random target group size. Default 6. */
+  /** Largest random target group size. Default 5 (the product's group cap). */
   targetMax?: number;
   /** Picks a target size in [lo, hi] inclusive. Default: uniform random. */
   pickSize?: (lo: number, hi: number) => number;
@@ -318,9 +367,16 @@ function pickSeedIndex(pool: PartitionMember[]): number {
  * The upshot: any pool of >= 2 is fully grouped (no one waits); only a pool of
  * exactly one returns that student in `waiting`, for the next run to collect.
  *
+ * Fill is composition-aware: the caps in `violatesComposition` (at most one
+ * brilliant student; strugglers capped by size) are hard while the pool offers
+ * an alternative. Candidates the caps reject wait in order and are only taken
+ * when compliant filling would leave a one-member group or strand exactly one
+ * student — the caps' stated exception, "unless there is no more available".
+ *
  * After each group is filled it is checked against `isolatedByProficiency` and
- * one swap is attempted if it fails, so "mix levels" does not quietly produce the
- * single arrangement the mix was meant to rule out.
+ * one swap is attempted if it fails, so "mix levels" does not quietly produce
+ * the single arrangement the mix was meant to rule out — a swap that would
+ * break the composition caps is not an improvement and is not taken.
  *
  * Pure: the caller's array is never mutated. Every input id appears exactly once
  * across `groups` and `waiting`.
@@ -330,7 +386,7 @@ export function partitionIntoGroups(
   opts: PartitionOptions = {}
 ): { groups: PartitionGroup[]; waiting: string[] } {
   const targetMin = opts.targetMin ?? 3;
-  const targetMax = opts.targetMax ?? 6;
+  const targetMax = opts.targetMax ?? 5;
   const pickSize = opts.pickSize ?? uniformSize;
 
   const pool = members.slice(); // mutable working copy; caller's array untouched
@@ -362,16 +418,70 @@ export function partitionIntoGroups(
         maxMembers: targetMax,
       }))
     );
-    let fillers = ranked.slice(0, size - 1);
 
-    // The greedy pick above can land on precisely the group the product decision
-    // forbids — one struggling student among confident ones — because each of
-    // those pairings scores well against the seed in isolation. One swap fixes
-    // every case that is fixable at this point: give up the weakest chosen filler
-    // for the best-ranked student left who breaks the isolation. If nobody does,
-    // the pool has nothing better to offer and the group stands as scored; the
-    // alternative is leaving students ungrouped, which the tail rules exist to
-    // avoid.
+    // The group's levels so far, optionally with one candidate's added — the
+    // shape `violatesComposition` reads. Individual levels, never a mean: the
+    // caps COUNT strugglers and brilliant students, and a mean would hide them.
+    const groupLevels = (
+      chosen: typeof ranked,
+      extra?: (typeof ranked)[number]
+    ): (number | null | undefined)[] => [
+      seed.profile.proficiency,
+      ...chosen.map((f) => f.proficiency),
+      ...(extra ? [extra.proficiency] : []),
+    ];
+
+    // Composition-aware fill. Walk the ranked list in score order and take only
+    // candidates whose addition keeps the group inside the caps at its TARGET
+    // size; the rest wait in order as the relaxation pool below. Demoted and
+    // passed-over candidates were never removed from the pool, so unless they
+    // are chosen below they simply fall to the next groups.
+    let fillers: typeof ranked = [];
+    const passedOver: typeof ranked = [];
+    for (const cand of ranked) {
+      if (fillers.length >= size - 1) break;
+      if (violatesComposition(groupLevels(fillers, cand), size)) {
+        passedOver.push(cand);
+      } else {
+        fillers.push(cand);
+      }
+    }
+
+    // Groups often end smaller than the target when the pool runs thin, and the
+    // struggling cap depends on size: a second struggler taken at a target of
+    // five can violate the cap in a group that stops at three or four. Give the
+    // lowest-ranked strugglers back until the ACTUAL size is compliant.
+    while (
+      fillers.length + 1 < size &&
+      violatesComposition(groupLevels(fillers), fillers.length + 1)
+    ) {
+      const lastStruggler = fillers
+        .map((f) => band(f.proficiency) <= 1)
+        .lastIndexOf(true);
+      if (lastStruggler < 0) break; // unreachable: only strugglers can newly violate
+      passedOver.push(fillers.splice(lastStruggler, 1)[0]);
+    }
+
+    // Relaxation: the caps are absolute "unless there is no more available".
+    // When compliant filling would leave a ONE-member group (not a group at
+    // all) or strand exactly one student for the next round — which can never
+    // place a lone student — fall back to the best candidates the caps passed
+    // over, in rank order.
+    while (
+      passedOver.length > 0 &&
+      (fillers.length === 0 || pool.length - fillers.length === 1)
+    ) {
+      fillers.push(passedOver.shift()!);
+    }
+
+    // The caps do not subsume the isolation rule: {1, 1, 3} in a group of five
+    // passes them (two strugglers and one brilliant at full size) yet still
+    // strands two strugglers with a single explainer and no bridge. One swap
+    // fixes every case that is fixable: give up the weakest chosen filler for
+    // the best unchosen student who breaks the isolation without breaking the
+    // caps. If nobody does, the pool has nothing better to offer and the group
+    // stands as scored; the alternative is leaving students ungrouped, which
+    // the tail rules exist to avoid.
     const isolated = (chosenFillers: typeof fillers) =>
       isolatedByProficiency([
         seed.profile.proficiency,
@@ -379,9 +489,14 @@ export function partitionIntoGroups(
       ]);
 
     if (isolated(fillers)) {
+      const chosenIds = new Set(fillers.map((f) => f.id));
       const kept = fillers.slice(0, -1);
-      for (const swap of ranked.slice(size - 1)) {
-        if (!isolated([...kept, swap])) {
+      for (const swap of ranked) {
+        if (chosenIds.has(swap.id)) continue;
+        if (
+          !isolated([...kept, swap]) &&
+          !violatesComposition(groupLevels(kept, swap), fillers.length + 1)
+        ) {
           fillers = [...kept, swap];
           break;
         }

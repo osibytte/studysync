@@ -30,6 +30,7 @@ import {
 } from '../_shared/availability.ts';
 import {
   rankCandidates,
+  violatesComposition,
   type Candidate,
   type ScoringProfile,
 } from '../_shared/matching.ts';
@@ -249,6 +250,8 @@ async function scoreExistingGroups(
     status: string;
     availability_summary: string;
     already_requested: boolean;
+    /** Members' individual ratings — the composition caps count, not a mean. */
+    levels: number[];
   };
 
   const shaped: GroupCandidate[] = eligible.map((g: any) => {
@@ -263,6 +266,7 @@ async function scoreExistingGroups(
       already_requested: requestedGroupIds.has(g.group_id),
       availability: commonGrid,
       proficiency: meanLevel(members.levels),
+      levels: members.levels,
       // A member row should always exist (the creator), but fall back to the
       // real count if the members read returned nothing for this group.
       memberCount: members.count,
@@ -274,7 +278,20 @@ async function scoreExistingGroups(
   // it is noise on a "find a group to join" list.
   const joinable = shaped.filter((g) => g.memberCount < g.maxMembers);
 
-  return rankCandidates(requester, joinable)
+  // The composition caps govern automatic matching, and this IS automatic
+  // matching: a group the requester would push over a cap — a second brilliant
+  // student, one struggler too many for the size they would make it — is not
+  // suggested, however good the schedule fit. They can still find it on
+  // discover and ask by hand; this only governs what matching proposes.
+  const compliant = joinable.filter(
+    (g) =>
+      !violatesComposition(
+        [...g.levels, requester.proficiency],
+        g.memberCount + 1
+      )
+  );
+
+  return rankCandidates(requester, compliant)
     .slice(0, MAX_RESULTS)
     .map((c) => ({
       group_id: c.group_id,
@@ -323,6 +340,16 @@ async function scoreLoneStudents(
 
   const shaped: StudentCandidate[] = rows
     .filter((r: any) => !groupedUserIds.has(r.user_id))
+    // Composition caps for the hypothetical pairing too: matching never
+    // suggests a pair of two strugglers (nobody to explain) or two brilliant
+    // students (one explainer too many).
+    .filter(
+      (r: any) =>
+        !violatesComposition(
+          [requester.proficiency, readLevel(r.proficiency)],
+          2
+        )
+    )
     .map((r: any) => {
       const grid = decodeAvailability(r.availability);
       return {
@@ -334,7 +361,7 @@ async function scoreLoneStudents(
         proficiency: readLevel(r.proficiency),
         // A hypothetical pairing: the other student is the sole existing member.
         memberCount: 1,
-        maxMembers: 8, // the spec's soft default cap for a new group
+        maxMembers: 5, // the product's group cap for a new group
       };
     });
 
