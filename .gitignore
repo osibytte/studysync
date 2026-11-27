@@ -34,3 +34,6 @@ revised_plain.txt
 source_plain.txt
 build_results_deck.py
 build_revised_dissertation.py
+
+# Internal engineering notes — kept local, never pushed
+HANDOFF.md
