@@ -1,4 +1,10 @@
 -- ============================================================================
+-- !!! LOCAL / DISPOSABLE DATABASE ONLY !!!
+-- Every seeded student gets a confirmed email and the same known password, so
+-- this file must never be run against production. The live demo accounts it
+-- created were deleted on 2026-11-26. Recreate demo students on a local
+-- Supabase instance or a throwaway branch, never on the linked project.
+-- ============================================================================
 -- StudySync — seed 36 students across 10 courses. No groups, and by default
 -- nobody joins the match pool either (c_apply below).
 --

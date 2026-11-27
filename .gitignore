@@ -18,3 +18,19 @@ Thumbs.db
 /ios
 /android
 .zcode/
+
+# Local agent/tool configuration
+.claude/
+.zcodeignore
+
+# Personal academic work — never commit
+.ch3.md
+.ch4.md
+.dissertation_full.md
+.dissertation_new/
+.dissertation_unpacked/
+docx_extract/
+revised_plain.txt
+source_plain.txt
+build_results_deck.py
+build_revised_dissertation.py
